@@ -109,6 +109,32 @@ testar com custo controlado). Ao reiniciar, continua de onde parou e retoma as a
 
 É uma triagem automática: os vereditos devem ser revisados por uma pessoa antes de qualquer publicação.
 
+## Publicação no Telegram
+Um terceiro processo leva as checagens e um resumo periódico a um canal do Telegram, **sempre com aprovação
+de um operador**: cada item chega antes a um chat de revisão com os botões ✅ Publicar / ❌ Descartar, e só
+vai ao canal depois do clique.
+
+Configuração (uma vez):
+1. No Telegram, fale com o **@BotFather** → `/newbot` e guarde o token. Ponha no **topo** do `~/.bashrc`:
+   `export TELEGRAM_BOT_TOKEN="..."`.
+2. Crie o canal e adicione o bot como **administrador** com permissão de publicar mensagens.
+3. Abra uma conversa com o bot (ou crie um grupo da equipe e adicione o bot): esse é o chat de revisão.
+4. `pixi run publish --whoami` e mande uma mensagem ao bot nesse chat: o terminal mostra o id do chat
+   (`--review-chat`) e o seu id de usuário (`--operators`).
+
+Uso, ao lado do `tx` e do `check`:
+```
+pixi run publish --channel @meu_canal --review-chat <id> --operators <id1,id2> --log-dir logs/<stream> \
+    --footer "Checagem assistida por IA, revisada pela equipe"
+```
+- **Checagens:** cada arquivo novo em `checking/checked/` vira um rascunho (resultado com ícone, quem,
+  afirmação, justificativa resumida e até 5 fontes consultadas). Resultados `erro` não vão para revisão.
+- **Resumos:** a cada `--summary-minutes` (padrão 10), com pelo menos 8 falas novas, o `claude-sonnet-5-5`
+  escreve um resumo neutro em tópicos, atribuído aos falantes; fica em `checking/summaries/` e também passa
+  pela revisão. `--no-summary` desliga.
+- Só os ids em `--operators` podem aprovar. O que foi enviado, publicado ou descartado fica em
+  `checking/.publish-state.json`: um reinício não reenvia nem publica duas vezes.
+
 ## Testes
 ```
 pixi run test

@@ -80,3 +80,17 @@ def test_long_message_wraps_aligned_to_text():
     assert len(lines) > 1
     indent = lines[0].index("capturando")
     assert all(line[:indent].strip() == "" for line in lines[1:])
+
+
+def test_secrets_are_masked_and_http_loggers_stay_quiet():
+    from livetx.console import setup_logging
+
+    con = terminal(width=200)
+    setup_logging(con, verbose=True)
+    logging.getLogger("httpx").info("POST https://api.telegram.org/bot123:AAHsecretsecretsecret_123/getMe")
+    logging.getLogger("livetx.x").info("url https://api.telegram.org/bot123:AAHsecretsecretsecret_123/getMe %s",
+                                       "e chave sk-ant-api03-abcdefghijkl")
+    out = con.export_text()
+    assert "AAHsecret" not in out and "abcdefghijkl" not in out
+    assert out.count("bot123:<oculto>") == 1 and "sk-ant-<oculto>" in out  # httpx nem aparece
+    logging.getLogger().handlers.clear()

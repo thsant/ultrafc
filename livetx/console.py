@@ -106,9 +106,32 @@ class MessageHandler(logging.Handler):
             self.handleError(record)
 
 
+# Clientes HTTP registram a URL de cada requisição; a da API do Telegram contém o token do bot.
+_HTTP_LOGGERS = ("httpx", "httpx2", "httpcore", "httpcore2", "urllib3")
+_SECRETS = re.compile(r"(bot\d+):[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{10,}")
+
+
+class RedactSecrets(logging.Filter):
+    """Mascara tokens de bot do Telegram e chaves da Anthropic que apareçam numa mensagem."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        clean = _SECRETS.sub(lambda m: f"{m.group(1)}:<oculto>" if m.group(1) else "sk-ant-<oculto>", message)
+        if clean != message:
+            record.msg, record.args = clean, None
+        return True
+
+
 def setup_logging(console: Console, verbose: bool = False) -> None:
-    """Mensagens do livetx em INFO (DEBUG com -v); bibliotecas só a partir de WARNING (INFO com -v)."""
+    """Mensagens do livetx em INFO (DEBUG com -v); bibliotecas só a partir de WARNING (INFO com -v).
+
+    Os clientes HTTP ficam sempre em WARNING, mesmo com -v, para não expor tokens nas URLs.
+    """
     root = logging.getLogger()
-    root.handlers[:] = [MessageHandler(console, show_names=verbose)]
+    handler = MessageHandler(console, show_names=verbose)
+    handler.addFilter(RedactSecrets())
+    root.handlers[:] = [handler]
     root.setLevel(logging.INFO if verbose else logging.WARNING)
     logging.getLogger("livetx").setLevel(logging.DEBUG if verbose else logging.INFO)
+    for name in _HTTP_LOGGERS:
+        logging.getLogger(name).setLevel(logging.WARNING)

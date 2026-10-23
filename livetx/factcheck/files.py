@@ -115,6 +115,21 @@ def parse_claim(text: str) -> Claim:
                  fields.get("tipo", ""), afirmacao.strip(), trecho, sections.get("Por que checar", ""))
 
 
+_SOURCE = re.compile(r"^\d+\. \[(.*?)\]\((.*?)\) — (.*?)( \*\(não consultada pelo agente\)\*)?$")
+
+
+def parse_verdict(text: str) -> tuple[Claim, Verdict]:
+    """Inverso de `render_verdict`."""
+    fields, sections = _sections(text)
+    claim = parse_claim(text)
+    fontes = [Source(m.group(1), m.group(2), m.group(3), m.group(4) is None)
+              for line in sections.get("Fontes consultadas", "").splitlines()
+              if (m := _SOURCE.match(line.strip()))]
+    verdict = Verdict(fields.get("resultado", ""), sections.get("Justificativa", ""), fontes,
+                      fields.get("modelo", ""), fields.get("checado_em", ""))
+    return claim, verdict
+
+
 def pending(out: Path) -> list[Claim]:
     """Afirmações em to_check/ que ainda não têm resultado em checked/, em ordem de id."""
     todo, done = out / "to_check", out / "checked"
