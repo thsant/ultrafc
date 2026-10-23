@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from . import usage
+from .base import Base
 from .check import fallback_options, web_tools
 from .files import Claim, Review, Verdict, now
 
@@ -37,7 +38,8 @@ resultado que o checador atribuiu, a justificativa e o resumo dele e as fontes q
 essa checagem pode ser publicada.
 
 - Use só as fontes listadas. Você pode reler cada uma com `web_fetch`; não pesquise outras fontes. Fontes \
-marcadas como não consultadas pelo checador não contam como evidência.
+marcadas como não consultadas pelo checador não contam como evidência. Fontes da base da equipe vêm \
+anexadas como documentos: confira-as pelo texto anexado, sem `web_fetch`.
 - Confira se cada fonte diz o que o checador afirma que ela diz, e se o conjunto sustenta o resultado \
 escolhido, inclusive a escolha entre `verdadeiro`, `falso`, `exagerado`, `omissão` e `inconclusivo`.
 - O resumo vai sozinho num card para redes sociais: confira se ele, lido isoladamente, é fiel às fontes.
@@ -48,11 +50,14 @@ outro, ou se não foi possível ler fontes suficientes para confirmar.
 """
 
 
-def build_prompt(c: Claim, v: Verdict) -> str:
-    fontes = "\n".join(
-        f"{i}. {s.titulo} — {s.url}\n   O checador diz que mostra: {s.o_que_sustenta}"
-        + ("" if s.consultada else "\n   (não consultada pelo checador)")
-        for i, s in enumerate(v.fontes, 1)) or "Nenhuma."
+def build_prompt(c: Claim, v: Verdict, base: Base | None = None) -> str:
+    def note(s) -> str:
+        if base and base.by_url(s.url):
+            return "\n   (da base da equipe: texto anexado)"
+        return "" if s.consultada else "\n   (não consultada pelo checador)"
+
+    fontes = "\n".join(f"{i}. {s.titulo} — {s.url}\n   O checador diz que mostra: {s.o_que_sustenta}" + note(s)
+                       for i, s in enumerate(v.fontes, 1)) or "Nenhuma."
     return (f"Afirmação: {c.afirmacao}\n"
             f"Quem disse: {c.quem}\n"
             f"Quando: {c.horario}\n"
@@ -67,9 +72,19 @@ def _rejected(model: str, reason: str) -> Review:
     return Review(False, reason, model, now())
 
 
-async def review(client, model: str, claim: Claim, verdict: Verdict) -> Review:
-    messages: list = [{"role": "user", "content": build_prompt(claim, verdict)}]
-    tools = [*web_tools(model, 0, max(len(verdict.fontes), 1), max_content_tokens=FETCH_TOKENS), REVIEW_TOOL]
+def base_documents(verdict: Verdict, base: Base | None) -> list[dict]:
+    """As matérias da base citadas pelo checador; o revisor não conseguiria relê-las na web (Folha, g1…)."""
+    found = {a.arquivo: a for s in verdict.fontes if base and (a := base.by_url(s.url))}
+    return [{"type": "document", "title": f"{a.label or a.arquivo} ({a.url})"[:500],
+             "source": {"type": "text", "media_type": "text/plain", "data": a.texto}} for a in found.values()]
+
+
+async def review(client, model: str, claim: Claim, verdict: Verdict, base: Base | None = None) -> Review:
+    docs = base_documents(verdict, base)
+    prompt = build_prompt(claim, verdict, base)
+    messages: list = [{"role": "user", "content": [*docs, {"type": "text", "text": prompt}] if docs else prompt}]
+    web = sum(1 for s in verdict.fontes if not (base and base.by_url(s.url)))
+    tools = [*web_tools(model, 0, max(web, 1), max_content_tokens=FETCH_TOKENS), REVIEW_TOOL]
     for _ in range(MAX_TURNS):
         response = await client.beta.messages.create(
             model=model,

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
-from urllib.parse import urldefrag
 
 from . import usage
+from .base import Base
+from .base import norm as _norm
 from .detect import FALLBACK_BETA
 from .files import RESULTS, Claim, Source, Verdict, now
 
@@ -92,6 +93,13 @@ aponte o detalhe na justificativa.
 em redes sociais) e só as fontes que você de fato consultou nesta pesquisa (com a URL exata). Não escreva o veredito em texto: use a ferramenta.\
 """
 
+BASE_RULES = """
+
+- Abaixo vem uma base de matérias jornalísticas selecionadas pela equipe. Comece por ela: se uma matéria \
+trata da afirmação, use-a e cite-a com a URL indicada no atributo `url` da matéria. Use a busca na web para o \
+que a base não cobre, para dados mais recentes que os da base e para buscar versões contrárias.\
+"""
+
 
 def build_prompt(c: Claim) -> str:
     return (f"Afirmação a checar: {c.afirmacao}\n"
@@ -99,10 +107,6 @@ def build_prompt(c: Claim) -> str:
             f"Quando: {c.horario}\n"
             f"Fala transcrita: \"{c.trecho}\"\n"
             f"Por que foi selecionada: {c.rationale}")
-
-
-def _norm(url: str) -> str:
-    return urldefrag(url)[0].rstrip("/").lower()
 
 
 def _consulted_urls(content) -> set[str]:
@@ -120,9 +124,10 @@ def _error(model: str, reason: str) -> Verdict:
     return Verdict("erro", reason, [], model, now())
 
 
-async def check(client, model: str, claim: Claim) -> Verdict:
+async def check(client, model: str, claim: Claim, base: Base | None = None, searches: int = 8) -> Verdict:
     messages: list = [{"role": "user", "content": build_prompt(claim)}]
-    consulted: set[str] = set()
+    consulted: set[str] = base.urls() if base else set()
+    system = base.system(SYSTEM + BASE_RULES) if base else SYSTEM
     for _ in range(MAX_TURNS):
         response = await client.beta.messages.create(
             model=model,
@@ -130,8 +135,8 @@ async def check(client, model: str, claim: Claim) -> Verdict:
             **fallback_options(model),
             thinking={"type": "adaptive"},
             output_config={"effort": "high"},
-            system=SYSTEM,
-            tools=[*web_tools(model, 8, 6), VERDICT_TOOL],
+            system=system,
+            tools=[*web_tools(model, searches, 6), VERDICT_TOOL],
             messages=messages,
         )
         usage.record(model, response.usage)

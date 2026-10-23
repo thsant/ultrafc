@@ -62,6 +62,11 @@ def test_check_message_escapes_html_and_lists_only_consulted_sources():
     assert html.endswith("#checagem\n<i>Revisado pela equipe</i>")
 
 
+def test_base_source_without_url_is_plain_text():
+    html = format_check(claim(), verdict(fontes=[Source("Nota da equipe", "base:nota.txt", "x")]))
+    assert "<b>Fontes:</b> Nota da equipe" in html and "base:" not in html
+
+
 def test_long_justification_is_cut_at_paragraph_and_fits_telegram():
     long = "\n\n".join(f"Parágrafo {i} " + "palavra " * 60 for i in range(30))
     html = format_check(claim(), verdict(justificativa=long))

@@ -14,6 +14,7 @@ from rich_argparse import RichHelpFormatter
 
 from ..console import make_consoles, setup_logging
 from ..logger import TIME_FORMAT, LogLine
+from . import base as kb
 from . import check as checker
 from . import detect as detector
 from . import review as reviewer
@@ -38,6 +39,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--check-model", default=checker.DEFAULT_MODEL)
     p.add_argument("--review-model", default=reviewer.DEFAULT_MODEL,
                    help="confere cada checagem só com as fontes citadas; reprovadas vão para rejected/")
+    p.add_argument("--base", type=Path, default=Path("base"),
+                   help="pasta de matérias (.md/.txt) que vão inteiras no prompt do checador (padrão: base)")
+    p.add_argument("--no-base", action="store_true", help="não usa a base de matérias")
+    p.add_argument("--max-searches", type=int,
+                   help="buscas na web por afirmação (padrão: 3 com a base, 8 sem ela)")
     p.add_argument("--max-parallel", type=int, default=3, help="checagens simultâneas (padrão: 3)")
     p.add_argument("--window-lines", type=int, default=6, help="linhas novas que disparam a detecção")
     p.add_argument("--window-seconds", type=float, default=45.0,
@@ -70,6 +76,21 @@ class FactChecker:
         self.counts: collections.Counter = collections.Counter()
         self.started = time.strftime(TIME_FORMAT)
         self.usage_path = args.out / "usage" / f"{self.stream}-{time.strftime('%Y%m%d-%H%M%S')}.json"
+        self.base = None if args.no_base else kb.Base(args.base)
+
+    async def describe_base(self) -> None:
+        if not self.base:
+            return
+        try:
+            tokens = await self.base.count_tokens(self.client, self.args.check_model)
+        except Exception as exc:  # noqa: BLE001 - a contagem é só informativa
+            log.debug("não foi possível contar os tokens da base: %s", exc)
+            tokens = None
+        log.info("base: %d matéria(s) em %s%s", len(self.base.articles), self.args.base,
+                 f", ~{tokens:,} tokens" if tokens else "")
+        if tokens and tokens > kb.WARN_TOKENS and self.args.check_model.startswith("claude-haiku-"):
+            log.warning("base com mais de %s tokens: com os resultados da web, o prompt passa de 100 mil e o "
+                        "Haiku cobra 5× a entrada", f"{kb.WARN_TOKENS:,}")
 
     @property
     def stopped(self) -> bool:
@@ -123,14 +144,18 @@ class FactChecker:
             self.running += 1
             log.info("checando (%d em andamento, %d na fila): %s", self.running, self.queue.qsize(),
                      claim.afirmacao[:80])
+            if self.base is not None and self.base.refresh():
+                await self.describe_base()
+            base = self.base or None
+            searches = self.args.max_searches if self.args.max_searches is not None else 3 if base else 8
             try:
-                verdict = await checker.check(self.client, self.args.check_model, claim)
+                verdict = await checker.check(self.client, self.args.check_model, claim, base, searches)
             except Exception as exc:  # noqa: BLE001 - o erro vira um resultado registrado, não some
                 verdict = checker._error(self.args.check_model, f"falha na checagem: {exc}")
             rev = None
             if verdict.resultado != "erro":  # erro não tem o que revisar e não é publicado
                 try:
-                    rev = await reviewer.review(self.client, self.args.review_model, claim, verdict)
+                    rev = await reviewer.review(self.client, self.args.review_model, claim, verdict, base)
                 except Exception as exc:  # noqa: BLE001 - sem revisão, não publica
                     rev = reviewer._rejected(self.args.review_model, f"falha na revisão: {exc}")
             directory = self.done_dir if rev is None or rev.aprovado else self.rejected_dir
@@ -157,6 +182,7 @@ class FactChecker:
         self.console.print(line)
 
     async def run(self) -> None:
+        await self.describe_base()
         for path in sorted(self.todo_dir.glob("*.md")):  # evita registrar de novo o que já foi visto
             claim = parse_claim(path.read_text(encoding="utf-8"))
             if claim.stream == self.stream:

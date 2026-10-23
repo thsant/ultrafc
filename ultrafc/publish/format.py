@@ -44,9 +44,16 @@ def _footer(footer: str | None, tag: str) -> str:
     return f"\n\n{tag}" + (f"\n<i>{escape(footer)}</i>" if footer else "")
 
 
+def _link(s) -> str:
+    """Uma matéria da base sem URL (`base:<arquivo>`) sai só com o título: o Telegram recusa o link."""
+    if not s.url.startswith(("http://", "https://")):
+        return escape(s.titulo or s.url)
+    return f'<a href="{escape(s.url, quote=True)}">{escape(s.titulo or s.url)}</a>'
+
+
 def format_check(claim: Claim, verdict: Verdict, footer: str | None = None) -> str:
     fontes = [s for s in verdict.fontes if s.consultada][:MAX_SOURCES]
-    links = " · ".join(f'<a href="{escape(s.url, quote=True)}">{escape(s.titulo or s.url)}</a>' for s in fontes)
+    links = " · ".join(_link(s) for s in fontes)
     head = (f"{ICONS.get(verdict.resultado, '•')} <b>{escape(verdict.resultado.upper())}</b>\n"
             f"{escape(claim.quem)} · {_short_time(claim.horario)}\n"
             f"«{escape(claim.afirmacao)}»\n\n")

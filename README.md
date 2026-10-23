@@ -121,6 +121,26 @@ pixi run check --log-dir logs/<stream>        # em outro terminal, junto com o p
    | **omissão** | o que foi dito está correto, mas falta um contexto que muda a conclusão |
    | **inconclusivo** | depois da pesquisa, as fontes não bastam para confirmar nem refutar |
 
+**Base de matérias.** Antes da live, a equipe pode pôr 20–30 matérias numa pasta `base/` (fica fora do git):
+todas vão inteiras no prompt do checador, em cache. O agente começa por elas, cita cada uma pela URL e usa a
+web só para o que falta, para dados mais novos e para versões contrárias: são 3 buscas por afirmação em vez de
+8 (`--max-searches` muda). A leitura do cache custa 1/10 da entrada. Também é o jeito de usar matérias de sites
+que bloqueiam a IA (Folha, g1…): o revisor recebe o texto da base anexado, em vez de tentar relê-lo na web.
+```
+---
+url: https://www1.folha.uol.com.br/…
+veiculo: Folha de S.Paulo
+titulo: …
+data: 2026-10-20
+---
+texto da matéria
+```
+Um `.txt` sem cabeçalho também vale: se a 1ª linha for uma URL, ela é usada; sem URL, a matéria é citada
+como `base:<arquivo>` e publicada sem link. A pasta é relida a cada checagem, então dá para acrescentar
+matérias durante a live. Ao iniciar, o terminal mostra quantos tokens a base ocupa. Com o Haiku, uma base
+acima de ~80 mil tokens leva o prompt a passar de 100 mil, e a partir daí a entrada custa 5× (o custo
+gravado em `usage/` já conta isso). `--base` aponta outra pasta e `--no-base` desliga a base.
+
 Precisa de `ANTHROPIC_API_KEY` no ambiente (exportada no topo do `~/.bashrc`, antes do bloco que
 interrompe shells não interativos). Por padrão só analisa o que for escrito depois de iniciar; `--from-start`
 analisa o log todo, `--once` sai ao terminar, e `--stop-after N` limita o número de afirmações (útil para

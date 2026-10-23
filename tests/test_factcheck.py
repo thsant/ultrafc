@@ -5,6 +5,7 @@ from types import SimpleNamespace as NS
 
 import pytest
 
+from ultrafc.factcheck import base as kb
 from ultrafc.factcheck import check as checker
 from ultrafc.factcheck import review as reviewer
 from ultrafc.factcheck import usage
@@ -218,6 +219,91 @@ def test_review_without_conclusion_rejects(answer, reason):
     assert not r.aprovado and reason in r.motivo
 
 
+# --- base de matérias -------------------------------------------------------------------------
+
+FOLHA = "https://www1.folha.uol.com.br/poder/2026/10/gastometro.shtml"
+
+
+def make_base(tmp_path):
+    d = tmp_path / "base"
+    d.mkdir(exist_ok=True)
+    (d / "b-folha.md").write_text(f"---\nurl: {FOLHA}\nveiculo: Folha de S.Paulo\ntitulo: Gastômetro\n"
+                                  "data: 2026-10-20\n---\nO pacote soma R$ 354 bilhões.\n")
+    (d / "a-agencia.txt").write_text("https://agenciabrasil.ebc.com.br/x\nTexto da Agência Brasil.\n")
+    (d / "c-sem-url.txt").write_text("Nota interna da equipe.\n")
+    (d / "ignorado.pdf").write_text("x")
+    return kb.Base(d)
+
+
+def test_base_reads_frontmatter_and_url_line_in_stable_order(tmp_path):
+    b = make_base(tmp_path)
+    assert [a.arquivo for a in b.articles] == ["a-agencia.txt", "b-folha.md", "c-sem-url.txt"]
+    agencia, folha, nota = b.articles
+    assert (agencia.url, agencia.titulo, agencia.texto) == ("https://agenciabrasil.ebc.com.br/x", "a-agencia",
+                                                           "Texto da Agência Brasil.")
+    assert (folha.veiculo, folha.titulo, folha.data, folha.texto) == ("Folha de S.Paulo", "Gastômetro",
+                                                                      "2026-10-20", "O pacote soma R$ 354 bilhões.")
+    assert nota.url == "base:c-sem-url.txt"
+    assert b.by_url(FOLHA.upper() + "/#topo") is folha
+    text = b.text()
+    assert text.index("a-agencia") < text.index("Gastômetro") and f'url="{FOLHA}"' in text
+
+
+def test_base_refresh_detects_new_file(tmp_path):
+    b = make_base(tmp_path)
+    assert not b.refresh()
+    (tmp_path / "base" / "d-nova.md").write_text("https://exame.com/y\nNova.\n")
+    assert b.refresh() and len(b.articles) == 4
+    assert not kb.Base(tmp_path / "nao-existe")
+
+
+def test_check_with_base_caches_corpus_and_counts_base_sources_as_consulted(tmp_path):
+    b = make_base(tmp_path)
+    c = client(creates=[response("tool_use", verdict_call("exagerado", FOLHA, "https://inventada.com"))])
+    v = asyncio.run(checker.check(c, "claude-haiku-5-5", claim(), b, searches=3))
+    assert [s.consultada for s in v.fontes] == [True, False]
+    call = c.beta.messages.calls[0]
+    rules, corpus = call["system"]
+    assert "cache_control" not in rules and checker.BASE_RULES in rules["text"]
+    assert corpus["cache_control"] == {"type": "ephemeral"} and "R$ 354 bilhões" in corpus["text"]
+    search = next(t for t in call["tools"] if t.get("name") == "web_search")
+    assert search["max_uses"] == 3
+
+
+def test_review_attaches_base_articles_and_fetches_only_web_sources(tmp_path):
+    b = make_base(tmp_path)
+    v = Verdict("exagerado", "x", [Source("Folha", FOLHA, "soma R$ 354 bi"),
+                                   Source("Ata", "https://alerj.rj.gov.br/ata", "placar")], "m", "t")
+    c = client()
+    asyncio.run(reviewer.review(c, "claude-opus-5-5", claim(), v, b))
+    call = c.beta.messages.calls[0]
+    doc, text = call["messages"][0]["content"]
+    assert doc["type"] == "document" and doc["source"]["data"] == "O pacote soma R$ 354 bilhões."
+    assert "Folha de S.Paulo — Gastômetro" in doc["title"]
+    assert "(da base da equipe: texto anexado)" in text["text"]
+    fetch = next(t for t in call["tools"] if t.get("name") == "web_fetch")
+    assert fetch["max_uses"] == 1
+
+
+def test_pipeline_uses_base_with_fewer_searches(tmp_path):
+    make_base(tmp_path)
+    c = client(parses=[[found(0, "Afirmação com base")]])
+    run_once(tmp_path, c)
+    check_call = next(k for k in c.beta.messages.calls if any(t.get("name") == "registrar_veredito"
+                                                            for t in k.get("tools", [])))
+    assert isinstance(check_call["system"], list)
+    assert next(t for t in check_call["tools"] if t.get("name") == "web_search")["max_uses"] == 3
+
+
+def test_pipeline_without_base_keeps_eight_searches(tmp_path):
+    c = client(parses=[[found(0, "Afirmação sem base")]])
+    run_once(tmp_path, c)
+    check_call = next(k for k in c.beta.messages.calls if any(t.get("name") == "registrar_veredito"
+                                                            for t in k.get("tools", [])))
+    assert check_call["system"] == checker.SYSTEM
+    assert next(t for t in check_call["tools"] if t.get("name") == "web_search")["max_uses"] == 8
+
+
 # --- orquestração -----------------------------------------------------------------------------
 
 def found(i, texto):
@@ -230,7 +316,7 @@ def run_once(tmp_path, c, extra=()):
     logs.mkdir(parents=True, exist_ok=True)
     (logs / "2026-10-22.log").write_text("".join(line(i, "Lula", f"fala {i}") for i in range(12)))
     args = parse_args(["--log-dir", str(logs), "--out", str(tmp_path / "checking"), "--from-start", "--once",
-                       *extra])
+                       "--base", str(tmp_path / "base"), *extra])
     from rich.console import Console
     asyncio.run(FactChecker(args, c, Console(file=open("/dev/null", "w"))).run())
     return tmp_path / "checking"
@@ -269,6 +355,18 @@ def test_rejected_checks_go_to_rejected_and_usage_is_saved(tmp_path):
 def test_usage_cost_includes_searches():
     t = usage.collections.Counter(input_tokens=1_000_000, output_tokens=1_000_000, buscas=10)
     assert usage.cost("claude-haiku-5-5", t) == pytest.approx(0.10 + 0.50 + 0.10)
+
+
+def test_usage_charges_haiku_long_prompts_five_times():
+    usage._totals.clear()
+    usage.record("claude-haiku-5-5", NS(input_tokens=1_000, cache_read_input_tokens=150_000, output_tokens=0))
+    usage.record("claude-haiku-5-5", NS(input_tokens=1_000, cache_read_input_tokens=50_000, output_tokens=0))
+    usage.record("claude-sonnet-5-5", NS(input_tokens=200_000, output_tokens=0))
+    haiku, sonnet = usage._totals["claude-haiku-5-5"], usage._totals["claude-sonnet-5-5"]
+    expected = (5 * (1_000 * 0.10 + 150_000 * 0.01) + 1_000 * 0.10 + 50_000 * 0.01) / 1e6
+    assert usage.cost("claude-haiku-5-5", haiku) == pytest.approx(expected)
+    assert usage.cost("claude-sonnet-5-5", sonnet) == pytest.approx(200_000 * 2.0 / 1e6)
+    usage._totals.clear()
 
 
 def test_stop_after_limits_claims_and_failure_is_recorded(tmp_path):
