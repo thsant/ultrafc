@@ -1,7 +1,7 @@
 import numpy as np
 
-from livetx.segmenter import Segmenter
-from livetx.source import SAMPLE_RATE
+from ultrafc.segmenter import Segmenter
+from ultrafc.source import SAMPLE_RATE
 
 CHUNK = SAMPLE_RATE // 2
 

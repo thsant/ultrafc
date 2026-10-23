@@ -1,4 +1,4 @@
-"""CLI: `python -m livetx.factcheck --log-dir logs/<stream>` acompanha a transcrição e checa afirmações."""
+"""CLI: `python -m ultrafc.factcheck --log-dir logs/<stream>` acompanha a transcrição e checa afirmações."""
 
 from __future__ import annotations
 
@@ -20,14 +20,14 @@ from . import usage
 from .files import Claim, new_id, parse_claim, pending, render_claim, render_verdict, write_atomic
 from .tail import LogTail
 
-log = logging.getLogger("livetx.factcheck")
+log = logging.getLogger("ultrafc.factcheck")
 
 RESULT_STYLE = {"verdadeiro": "bold green", "falso": "bold red", "exagerado": "bold dark_orange",
                 "omissão": "bold yellow", "inconclusivo": "bold blue", "erro": "bold magenta"}
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(prog="livetx.factcheck", description=__doc__, formatter_class=RichHelpFormatter)
+    p = argparse.ArgumentParser(prog="ultrafc.factcheck", description=__doc__, formatter_class=RichHelpFormatter)
     src = p.add_mutually_exclusive_group(required=True)
     src.add_argument("--log-dir", type=Path, help="pasta da stream (logs/<stream>): segue o log do dia")
     src.add_argument("--log", type=Path, help="um arquivo de log específico")

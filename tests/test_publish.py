@@ -2,12 +2,12 @@ import asyncio
 import time
 from types import SimpleNamespace as NS
 
-from livetx.factcheck.files import Claim, Source, Verdict, render_verdict
-from livetx.logger import LogLine
-from livetx.publish import summary as summarizer
-from livetx.publish.__main__ import parse_args, scan_checks
-from livetx.publish.format import MAX_MESSAGE, format_check, format_summary, trim_paragraphs
-from livetx.publish.review import DISCARD, PUBLISH, Reviewer, short_key
+from ultrafc.factcheck.files import Claim, Source, Verdict, render_verdict
+from ultrafc.logger import LogLine
+from ultrafc.publish import summary as summarizer
+from ultrafc.publish.__main__ import parse_args, scan_checks
+from ultrafc.publish.format import MAX_MESSAGE, format_check, format_summary, trim_paragraphs
+from ultrafc.publish.review import DISCARD, PUBLISH, Reviewer, short_key
 
 T0 = time.mktime((2026, 10, 22, 22, 11, 35, 0, 0, -1))
 OPERATOR, STRANGER = 111, 999
@@ -141,7 +141,7 @@ def test_scan_sends_checks_but_not_errors(tmp_path):
 # --- resumo e CLI -----------------------------------------------------------------------------
 
 def test_summarize_and_save(tmp_path):
-    from livetx.publish.summary import Resumo
+    from ultrafc.publish.summary import Resumo
 
     calls = []
 
@@ -191,7 +191,7 @@ class ChannelBot:
 def test_channel_check_refuses_channel_where_bot_cannot_post():
     import pytest
 
-    from livetx.publish.__main__ import check_channel
+    from ultrafc.publish.__main__ import check_channel
 
     for bot in (ChannelBot(None), ChannelBot("member"), ChannelBot("administrator", can_post=False)):
         with pytest.raises(SystemExit, match="'Yt' \\(@ultrafc, id -1002900827044\\)"):

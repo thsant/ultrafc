@@ -123,7 +123,7 @@ class RedactSecrets(logging.Filter):
 
 
 def setup_logging(console: Console, verbose: bool = False) -> None:
-    """Mensagens do livetx em INFO (DEBUG com -v); bibliotecas só a partir de WARNING (INFO com -v).
+    """Mensagens do ultrafc em INFO (DEBUG com -v); bibliotecas só a partir de WARNING (INFO com -v).
 
     Os clientes HTTP ficam sempre em WARNING, mesmo com -v, para não expor tokens nas URLs.
     """
@@ -132,6 +132,6 @@ def setup_logging(console: Console, verbose: bool = False) -> None:
     handler.addFilter(RedactSecrets())
     root.handlers[:] = [handler]
     root.setLevel(logging.INFO if verbose else logging.WARNING)
-    logging.getLogger("livetx").setLevel(logging.DEBUG if verbose else logging.INFO)
+    logging.getLogger("ultrafc").setLevel(logging.DEBUG if verbose else logging.INFO)
     for name in _HTTP_LOGGERS:
         logging.getLogger(name).setLevel(logging.WARNING)

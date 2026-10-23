@@ -1,7 +1,7 @@
 import os
 import time
 
-from livetx.people import PeopleMap, parse
+from ultrafc.people import PeopleMap, parse
 
 
 def test_parse_tolerates_spaces_comments_and_case():

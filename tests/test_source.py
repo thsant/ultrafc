@@ -2,8 +2,8 @@ import subprocess
 
 import numpy as np
 
-from livetx.logger import TranscriptLog, format_line
-from livetx.source import SAMPLE_RATE, AudioSource, Media, ResolverOptions, ffmpeg_command, resolve
+from ultrafc.logger import TranscriptLog, format_line
+from ultrafc.source import SAMPLE_RATE, AudioSource, Media, ResolverOptions, ffmpeg_command, resolve
 
 
 def test_direct_urls_bypass_ytdlp():

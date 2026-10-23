@@ -1,11 +1,23 @@
-# livetx — transcrição ao vivo de streams
+# ultrafc — transcrição, falantes, checagem de fatos e publicação de lives
 
-Captura o áudio de uma live (YouTube, Instagram, G1/Globoplay, Twitch, HLS, RTMP, UDP…), transcreve
-em português com [faster-whisper](https://github.com/SYSTRAN/faster-whisper) na GPU e grava em log.
+O **ultrafc** acompanha uma transmissão em vídeo (YouTube, Instagram, G1/Globoplay, Twitch, HLS, RTMP, UDP…)
+e cobre quatro etapas:
+
+1. **Transcrição** ao vivo em português, com [faster-whisper](https://github.com/SYSTRAN/faster-whisper) na GPU;
+2. **Identificação dos falantes** por embeddings de voz (P1, P2… ou nomes informados pelo operador);
+3. **Checagem de fatos** com LLMs de raciocínio (Claude): um modelo encontra as afirmações verificáveis e
+   agentes com busca na web as checam em paralelo;
+4. **Publicação** das checagens e de resumos num canal do **Telegram**, sempre com aprovação de um operador.
 
 ```
-URL ──yt-dlp/streamlink──▶ URL de mídia ──ffmpeg──▶ PCM 16 kHz ──VAD (Silero)──▶ segmentos ──Whisper──▶ logs/<stream>/<data>.log
+URL ──yt-dlp──▶ ffmpeg ──▶ VAD ──▶ Whisper + falantes ──▶ logs/<stream>/<data>.log      (pixi run tx)
+                                                                │
+                                         detecção ──▶ checagem na web ──▶ checking/      (pixi run check)
+                                                                                 │
+                                         resumos ──▶ revisão do operador ──▶ canal do Telegram (pixi run publish)
 ```
+
+Cada etapa é um processo separado que lê a saída da anterior; dá para usar só a transcrição.
 
 ## Instalação
 ```
@@ -15,7 +27,7 @@ pixi run check-cuda      # deve imprimir 1 (GPU visível)
 
 ## Uso
 ```
-pixi run tx "https://www.youtube.com/@CNNbrasil/live"
+pixi run tx "https://www.youtube.com/watch?v=RugVB17uRVM"     # debate presidencial da Band, 2º turno
 pixi run tx "https://www.instagram.com/<usuario>/live/" --cookies-from-browser firefox
 pixi run tx "https://exemplo.com/stream/index.m3u8" --model medium
 tail -f logs/<stream>/$(date +%F).log
@@ -47,27 +59,27 @@ Latência: um segmento fecha após ~0,5 s de pausa (ou após `--max-segment`); s
 Conteúdo com DRM (parte do Globoplay) não pode ser capturado.
 
 ## Falantes (P1, P2, … PN)
-Cada linha leva o falante: `[2026-10-22 22:06:14] P1: Fábio, o que está acontecendo com a meta?`.
+Cada linha leva o falante: `[2026-10-22 22:12:41] P4: Você não respondeu à pergunta.`.
 Se a voz muda no meio de um trecho, a linha é dividida na palavra da troca.
 
 Funciona por embeddings de voz (3D-Speaker CAM++ via sherpa-onnx, CPU, ~20 ms por janela, baixado no 1º uso
-para `~/.cache/livetx/models/`). As janelas de 1,5 s são comparadas por cosseno com as vozes conhecidas. Uma voz
+para `~/.cache/ultrafc/models/`). As janelas de 1,5 s são comparadas por cosseno com as vozes conhecidas. Uma voz
 nova só é criada após ~3 s de fala seguida sem correspondência; trechos mais curtos (vinheta, música, um "ok")
 ficam com a voz conhecida mais parecida ou saem como `?`. A troca de falante exige vantagem de 0,1 sobre o
 atual. As vozes ficam em `logs/<stream>/speakers.npz` e mantêm o número entre execuções
 (`--reset-speakers` para esquecer). Se o modelo de voz mudar, o arquivo antigo é renomeado
 (`speakers.<modelo>.npz`) e as vozes começam do zero, porque vetores de modelos diferentes não se comparam.
 
-No confronto direto do debate da Band (13–25 min de https://www.youtube.com/watch?v=RugVB17uRVM), 95% das
+No confronto direto do debate da Band (13–25 min do vídeo do exemplo), 95% das
 palavras ficaram com o falante certo (o modelo anterior, WeSpeaker ResNet34, acertava 81%). Os erros
 restantes estão nas fronteiras de turno (~1 s) e em trocas muito rápidas.
 
 **Nomes:** o operador escreve num `people.txt` (relido a cada 10 s; outro caminho com `--people`):
 ```
-P1:William Waack
-P2:Claudio
+P1:Eduardo Oinegue
+P2:Adriana Araujo
 ```
-A partir daí, as linhas novas saem com o nome (`[…] William Waack: …`); as já gravadas não mudam. Linhas vazias e
+A partir daí, as linhas novas saem com o nome (`[…] Eduardo Oinegue: …`); as já gravadas não mudam. Linhas vazias e
 `# comentários` são ignoradas. Para várias lives em paralelo, use um `--people` por processo, porque os números são
 por stream.
 

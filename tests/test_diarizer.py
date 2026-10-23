@@ -1,8 +1,8 @@
 import numpy as np
 
-from livetx.diarizer import UNKNOWN, Diarizer, SpeakerRegistry, label_words, smooth, windows
-from livetx.source import SAMPLE_RATE
-from livetx.transcriber import Word
+from ultrafc.diarizer import UNKNOWN, Diarizer, SpeakerRegistry, label_words, smooth, windows
+from ultrafc.source import SAMPLE_RATE
+from ultrafc.transcriber import Word
 
 RNG = np.random.default_rng(0)
 DIM = 64

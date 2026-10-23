@@ -1,4 +1,4 @@
-"""CLI: `python -m livetx <url>` transcreve uma live e grava em logs/<stream>/<data>.log."""
+"""CLI: `python -m ultrafc <url>` transcreve uma live e grava em logs/<stream>/<data>.log."""
 
 from __future__ import annotations
 
@@ -19,11 +19,11 @@ from .segmenter import Segment, Segmenter, silero_vad
 from .source import AudioSource, ResolverOptions, resolve
 from .transcriber import Transcriber, join_words
 
-log = logging.getLogger("livetx")
+log = logging.getLogger("ultrafc")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(prog="livetx", description=__doc__, formatter_class=RichHelpFormatter)
+    p = argparse.ArgumentParser(prog="ultrafc", description=__doc__, formatter_class=RichHelpFormatter)
     p.add_argument("url", help="URL da live (YouTube, Instagram, G1...), .m3u8, udp://, rtmp:// ou arquivo")
     p.add_argument("--out-dir", default="logs", help="diretório base dos logs (padrão: logs)")
     p.add_argument("--name", help="nome da subpasta do log (padrão: derivado da stream)")
@@ -87,7 +87,7 @@ def main(argv: list[str] | None = None) -> None:
     with status("resolvendo a stream…"):
         name = args.name or resolve(args.url, opts).slug
     out = TranscriptLog(Path(args.out_dir) / name)
-    Display(stderr).header("livetx", name, f"modelo {args.model}", str(out.directory))
+    Display(stderr).header("ultrafc", name, f"modelo {args.model}", str(out.directory))
 
     diarize = None
     people = None

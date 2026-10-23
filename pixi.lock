@@ -3454,7 +3454,7 @@ packages:
   size: 24791
   timestamp: 1792622774790
 - pypi: ./
-  name: livetx
+  name: ultrafc
   requires_dist:
   - faster-whisper>=1.1
   - numpy

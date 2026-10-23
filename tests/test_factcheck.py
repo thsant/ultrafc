@@ -5,12 +5,12 @@ from types import SimpleNamespace as NS
 
 import pytest
 
-from livetx.factcheck import check as checker
-from livetx.factcheck.__main__ import FactChecker, parse_args
-from livetx.factcheck.detect import Afirmacao, Deteccao
-from livetx.factcheck.files import Claim, Source, Verdict, parse_claim, pending, render_claim, render_verdict
-from livetx.factcheck.tail import LogTail
-from livetx.logger import format_line
+from ultrafc.factcheck import check as checker
+from ultrafc.factcheck.__main__ import FactChecker, parse_args
+from ultrafc.factcheck.detect import Afirmacao, Deteccao
+from ultrafc.factcheck.files import Claim, Source, Verdict, parse_claim, pending, render_claim, render_verdict
+from ultrafc.factcheck.tail import LogTail
+from ultrafc.logger import format_line
 
 T0 = time.mktime((2026, 10, 22, 22, 11, 35, 0, 0, -1))
 
@@ -187,7 +187,7 @@ def test_stop_after_limits_claims_and_failure_is_recorded(tmp_path):
 
 
 def test_id_keeps_accented_letters_and_is_unique(tmp_path):
-    from livetx.factcheck.files import new_id
+    from ultrafc.factcheck.files import new_id
     first = new_id(T0, "Mais de 50 milhões votaram em Flávio", tmp_path)
     assert first == "20261022-221135-mais-de-50-milhoes-votaram-em-flavio"
     (tmp_path / f"{first}.md").write_text("x")

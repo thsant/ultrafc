@@ -3,8 +3,8 @@ import re
 
 from rich.console import Console
 
-from livetx.console import PALETTE, Display, MessageHandler, make_consoles, speaker_style
-from livetx.logger import format_line
+from ultrafc.console import PALETTE, Display, MessageHandler, make_consoles, speaker_style
+from ultrafc.logger import format_line
 
 TS = 1_761_177_600.0
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
@@ -50,7 +50,7 @@ def test_piped_output_is_plain_log_line():
 
 def test_messages_are_italic_with_level_icon():
     con = terminal()
-    log = logging.getLogger("livetx.test")
+    log = logging.getLogger("ultrafc.test")
     log.handlers[:] = [MessageHandler(con)]
     log.propagate = False
     log.setLevel(logging.INFO)
@@ -72,7 +72,7 @@ def test_color_never_has_no_ansi():
 
 def test_long_message_wraps_aligned_to_text():
     con = terminal(width=50)
-    log = logging.getLogger("livetx.test.wrap")
+    log = logging.getLogger("ultrafc.test.wrap")
     log.handlers[:] = [MessageHandler(con)]
     log.propagate = False
     log.warning("capturando https://manifest.googlevideo.com/api/manifest/hls_playlist/expire/1792741577")
@@ -83,12 +83,12 @@ def test_long_message_wraps_aligned_to_text():
 
 
 def test_secrets_are_masked_and_http_loggers_stay_quiet():
-    from livetx.console import setup_logging
+    from ultrafc.console import setup_logging
 
     con = terminal(width=200)
     setup_logging(con, verbose=True)
     logging.getLogger("httpx").info("POST https://api.telegram.org/bot123:AAHsecretsecretsecret_123/getMe")
-    logging.getLogger("livetx.x").info("url https://api.telegram.org/bot123:AAHsecretsecretsecret_123/getMe %s",
+    logging.getLogger("ultrafc.x").info("url https://api.telegram.org/bot123:AAHsecretsecretsecret_123/getMe %s",
                                        "e chave sk-ant-api03-abcdefghijkl")
     out = con.export_text()
     assert "AAHsecret" not in out and "abcdefghijkl" not in out

@@ -23,7 +23,7 @@ DEFAULT_MODEL = "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"
 DEFAULT_THRESHOLD = 0.45
 UNKNOWN = "?"  # fala curta demais para criar um falante e sem nenhum conhecido parecido
 MODEL_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/{}"
-MODEL_DIR = Path.home() / ".cache" / "livetx" / "models"
+MODEL_DIR = Path.home() / ".cache" / "ultrafc" / "models"
 
 # Recebe áudio float32 de 16 kHz e devolve o embedding normalizado (L2).
 EmbedFn = Callable[[np.ndarray], np.ndarray]

@@ -1,4 +1,4 @@
-"""CLI: `python -m livetx.publish` envia checagens e resumos para revisão no Telegram e publica no canal."""
+"""CLI: `python -m ultrafc.publish` envia checagens e resumos para revisão no Telegram e publica no canal."""
 
 from __future__ import annotations
 
@@ -19,14 +19,14 @@ from . import summary as summarizer
 from .format import format_check, format_summary
 from .review import Reviewer
 
-log = logging.getLogger("livetx.publish")
+log = logging.getLogger("ultrafc.publish")
 
 SCAN_SECONDS = 5.0
 MIN_SUMMARY_LINES = 8
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(prog="livetx.publish", description=__doc__, formatter_class=RichHelpFormatter)
+    p = argparse.ArgumentParser(prog="ultrafc.publish", description=__doc__, formatter_class=RichHelpFormatter)
     p.add_argument("--whoami", action="store_true",
                    help="só mostra o id do chat e do usuário de quem mandar mensagem ao bot")
     p.add_argument("--checking", type=Path, default=Path("checking"), help="pasta da checagem (padrão: checking)")
