@@ -1,4 +1,7 @@
-"""Fila de revisão no Telegram: rascunho com botões → canal, só com aprovação de um operador."""
+"""Fila de revisão no Telegram: rascunho com botões → canal, só com aprovação de um operador.
+
+Uma checagem pode vir com um card PNG, enviado como foto antes do texto (no rascunho e no canal).
+"""
 
 from __future__ import annotations
 
@@ -67,16 +70,32 @@ class Reviewer:
         self.state[item_id] = {"status": IGNORED, "motivo": reason}
         self._save()
 
-    async def submit(self, item_id: str, kind: str, html: str) -> None:
+    async def submit(self, item_id: str, kind: str, html: str, card: Path | None = None) -> None:
         if item_id in self.state:
             return
         key = short_key(item_id)
+        entry: dict = {"tipo": kind, "status": IN_REVIEW, "key": key, "texto": html}
+        if card is not None:
+            photo = await self.bot.send_photo(chat_id=self.review_chat, photo=card.read_bytes())
+            entry |= {"card": str(card), "card_msg_id": photo.message_id}
         msg = await self.bot.send_message(chat_id=self.review_chat, text=html, reply_markup=keyboard(key),
                                           **_options())
-        self.state[item_id] = {"tipo": kind, "status": IN_REVIEW, "key": key, "texto": html,
-                               "review_msg_id": msg.message_id}
+        self.state[item_id] = entry | {"review_msg_id": msg.message_id}
         self._save()
         log.info("📨 enviado para revisão: %s", item_id)
+
+    async def _publish_card(self, item_id: str, entry: dict) -> None:
+        """Foto antes do texto; marcada no estado para que uma nova tentativa não a repita."""
+        if "card" not in entry or entry.get("card_publicado"):
+            return
+        try:
+            photo = Path(entry["card"]).read_bytes()
+        except OSError as exc:
+            log.warning("card de %s indisponível (%s); publicando só o texto", item_id, exc)
+            return
+        await self.bot.send_photo(chat_id=self.channel, photo=photo)
+        entry["card_publicado"] = True
+        self._save()
 
     def _find(self, key: str) -> str | None:
         return next((i for i, e in self.state.items() if e.get("key") == key), None)
@@ -95,6 +114,7 @@ class Reviewer:
                 return f"Já {entry['status']} por {entry.get('por', '?')}."
             if action == PUBLISH:
                 try:
+                    await self._publish_card(item_id, entry)
                     await self.bot.send_message(chat_id=self.channel, text=entry["texto"], **_options())
                 except Exception as exc:  # noqa: BLE001 - o item continua em revisão para nova tentativa
                     log.warning("falha ao publicar %s: %s", item_id, exc)

@@ -33,16 +33,17 @@ REVIEW_TOOL = {
 
 SYSTEM = """\
 Você revisa o trabalho de um checador de fatos. Recebe uma afirmação feita numa transmissão ao vivo, o \
-resultado que o checador atribuiu, a justificativa dele e as fontes que ele citou. Sua tarefa é dizer se \
+resultado que o checador atribuiu, a justificativa e o resumo dele e as fontes que ele citou. Sua tarefa é dizer se \
 essa checagem pode ser publicada.
 
 - Use só as fontes listadas. Você pode reler cada uma com `web_fetch`; não pesquise outras fontes. Fontes \
 marcadas como não consultadas pelo checador não contam como evidência.
 - Confira se cada fonte diz o que o checador afirma que ela diz, e se o conjunto sustenta o resultado \
 escolhido, inclusive a escolha entre `verdadeiro`, `falso`, `exagerado`, `omissão` e `inconclusivo`.
+- O resumo vai sozinho num card para redes sociais: confira se ele, lido isoladamente, é fiel às fontes.
 - Aprove se a conclusão se sustenta com essas fontes, ainda que a redação possa melhorar. Reprove se uma \
-fonte foi mal lida, se a conclusão vai além do que as fontes mostram, se o resultado deveria ser outro, ou \
-se não foi possível ler fontes suficientes para confirmar.
+fonte foi mal lida, se a conclusão ou o resumo vão além do que as fontes mostram, se o resultado deveria ser \
+outro, ou se não foi possível ler fontes suficientes para confirmar.
 - Ao terminar, chame `registrar_revisao`. Não reescreva o veredito.\
 """
 
@@ -57,7 +58,8 @@ def build_prompt(c: Claim, v: Verdict) -> str:
             f"Quando: {c.horario}\n"
             f"Fala transcrita: \"{c.trecho}\"\n\n"
             f"Resultado do checador: {v.resultado}\n"
-            f"Justificativa: {v.justificativa}\n\n"
+            f"Justificativa: {v.justificativa}\n"
+            f"Resumo para o card: {v.resumo or '(nenhum)'}\n\n"
             f"Fontes citadas:\n{fontes}")
 
 

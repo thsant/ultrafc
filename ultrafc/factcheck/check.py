@@ -24,6 +24,9 @@ VERDICT_TOOL = {
             "resultado": {"type": "string", "enum": list(RESULTS)},
             "justificativa": {"type": "string",
                               "description": "Explicação objetiva, em português, apoiada nas fontes."},
+            "resumo": {"type": "string",
+                       "description": "1 a 2 frases, até 200 caracteres, que se entendam sozinhas, sem repetir "
+                                      "a afirmação: o que as fontes mostram. Vai num card para redes sociais."},
             "fontes": {
                 "type": "array",
                 "items": {
@@ -39,7 +42,7 @@ VERDICT_TOOL = {
                 },
             },
         },
-        "required": ["resultado", "justificativa", "fontes"],
+        "required": ["resultado", "justificativa", "resumo", "fontes"],
         "additionalProperties": False,
     },
 }
@@ -85,8 +88,8 @@ plausível e diga na justificativa se precisou interpretar.
 justificativa o que faltou. Não use para casos em que a evidência aponta claramente para outro resultado.
   Se a afirmação está correta no essencial e só um detalhe secundário diverge, prefira `verdadeiro` e \
 aponte o detalhe na justificativa.
-- Ao terminar, chame `registrar_veredito` com o resultado, a justificativa e só as fontes que você \
-de fato consultou nesta pesquisa (com a URL exata). Não escreva o veredito em texto: use a ferramenta.\
+- Ao terminar, chame `registrar_veredito` com o resultado, a justificativa, um resumo curto (para um card \
+em redes sociais) e só as fontes que você de fato consultou nesta pesquisa (com a URL exata). Não escreva o veredito em texto: use a ferramenta.\
 """
 
 
@@ -143,7 +146,7 @@ async def check(client, model: str, claim: Claim) -> Verdict:
             data = call.input
             fontes = [Source(f["titulo"], f["url"], f["o_que_sustenta"], _norm(f["url"]) in consulted)
                       for f in data.get("fontes", [])]
-            return Verdict(data["resultado"], data["justificativa"], fontes, model, now())
+            return Verdict(data["resultado"], data["justificativa"], fontes, model, now(), data.get("resumo", ""))
 
         messages.append({"role": "assistant", "content": response.content})
         if response.stop_reason == "pause_turn":

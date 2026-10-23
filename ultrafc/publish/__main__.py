@@ -17,6 +17,7 @@ from ..factcheck import usage
 from ..factcheck.files import parse_verdict
 from ..factcheck.tail import LogTail
 from . import summary as summarizer
+from .card import save_card
 from .format import format_check, format_summary
 from .review import Reviewer
 
@@ -40,6 +41,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--summary-model", default=summarizer.DEFAULT_MODEL)
     p.add_argument("--from-start", action="store_true", help="resume o log desde o início")
     p.add_argument("--footer", help='rodapé das mensagens (ex.: "Checagem assistida por IA, revisada pela equipe")')
+    p.add_argument("--card-brand", help="nome no rodapé dos cards (padrão: o @nome do canal)")
+    p.add_argument("--no-cards", action="store_true", help="publica as checagens só em texto, sem o card PNG")
     p.add_argument("--color", default="auto", choices=["auto", "always", "never"])
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args(argv)
@@ -56,8 +59,10 @@ def chat_id(value: str) -> int | str:
     return int(value) if value.lstrip("-").isdigit() else value
 
 
-async def scan_checks(reviewer: Reviewer, checked: Path, footer: str | None) -> None:
-    """Envia para revisão cada checagem nova; uma checagem com erro não tem o que publicar."""
+async def scan_checks(reviewer: Reviewer, checked: Path, footer: str | None, cards: Path | None = None,
+                      brand: str | None = None) -> None:
+    """Envia para revisão cada checagem nova (com o card, se `cards` for a pasta onde salvá-los);
+    uma checagem com erro não tem o que publicar."""
     for path in sorted(checked.glob("*.md")):
         item_id = path.stem
         if reviewer.known(item_id):
@@ -71,7 +76,8 @@ async def scan_checks(reviewer: Reviewer, checked: Path, footer: str | None) -> 
             log.warning("checagem com erro não vai para revisão: %s", item_id)
             reviewer.ignore(item_id, verdict.justificativa)
             continue
-        await reviewer.submit(item_id, "checagem", format_check(claim, verdict, footer))
+        card = None if cards is None else save_card(cards / f"{item_id}.png", claim, verdict, brand, footer)
+        await reviewer.submit(item_id, "checagem", format_check(claim, verdict, footer), card)
 
 
 async def summaries(reviewer: Reviewer, client, args, tail: LogTail, out: Path, usage_path: Path) -> None:
@@ -155,6 +161,8 @@ def main(argv: list[str] | None = None) -> None:
     from telegram.ext import Application, CallbackQueryHandler
 
     operators = {int(x) for x in args.operators.split(",") if x.strip()}
+    cards = None if args.no_cards else args.checking / "cards"
+    brand = args.card_brand or (args.channel if args.channel.startswith("@") else None)
     usage_path = args.checking / "usage" / f"publish-{time.strftime('%Y%m%d-%H%M%S')}.json"
     tasks: list[asyncio.Task] = []
 
@@ -176,7 +184,7 @@ def main(argv: list[str] | None = None) -> None:
         async def scan_loop() -> None:
             while True:
                 try:
-                    await scan_checks(reviewer, args.checking / "checked", args.footer)
+                    await scan_checks(reviewer, args.checking / "checked", args.footer, cards, brand)
                 except Exception as exc:  # noqa: BLE001 - erro de rede/Telegram: tenta na próxima volta
                     log.warning("falha ao enviar para revisão: %s", exc)
                 await asyncio.sleep(SCAN_SECONDS)

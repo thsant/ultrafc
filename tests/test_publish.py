@@ -5,6 +5,7 @@ from types import SimpleNamespace as NS
 from ultrafc.factcheck.files import Claim, Source, Verdict, render_verdict
 from ultrafc.logger import LogLine
 from ultrafc.publish import summary as summarizer
+from ultrafc.publish.card import COLORS, SIZE, render_card, summary_text
 from ultrafc.publish.__main__ import parse_args, scan_checks
 from ultrafc.publish.format import MAX_MESSAGE, format_check, format_summary, trim_paragraphs
 from ultrafc.publish.review import DISCARD, PUBLISH, Reviewer, short_key
@@ -35,6 +36,11 @@ class FakeBot:
         await asyncio.sleep(0.01)
         self._n += 1
         self.sent.append((chat_id, text, kw))
+        return NS(message_id=self._n)
+
+    async def send_photo(self, chat_id, photo, **kw):
+        self._n += 1
+        self.sent.append((chat_id, "<foto>", {"photo": photo}))
         return NS(message_id=self._n)
 
     async def edit_message_text(self, chat_id, message_id, text, **kw):
@@ -136,6 +142,60 @@ def test_scan_sends_checks_but_not_errors(tmp_path):
     asyncio.run(scan_checks(r, checked, None))  # segunda varredura não reenvia
     assert len(bot.sent) == 1 and "OMISSÃO" in bot.sent[0][1]
     assert r.state["erro-1"]["status"] == "ignorado"
+
+
+# --- cards -----------------------------------------------------------------------------------
+
+def test_card_is_square_png_with_result_color():
+    import io
+
+    from PIL import Image
+
+    for resultado, (band, _) in COLORS.items():
+        png = render_card(claim(), verdict(resultado), "@canal", "Revisado pela equipe")
+        img = Image.open(io.BytesIO(png))
+        assert img.format == "PNG" and img.size == (SIZE, SIZE)
+        assert img.getpixel((SIZE - 5, 5)) == Image.new("RGB", (1, 1), band).getpixel((0, 0))
+    long = claim()
+    long.afirmacao = "Ação, ônibus e coração " * 80  # cabe cortada, sem erro
+    render_card(long, verdict(justificativa="ç " * 2000))
+
+
+def test_card_summary_prefers_checker_summary():
+    v = verdict(justificativa="Primeira frase. Segunda frase.")
+    assert summary_text(v) == "Primeira frase."  # checagens antigas, sem resumo
+    v.resumo = "O valor está certo, mas não é recorde em proporção do PIB."
+    assert summary_text(v) == v.resumo
+
+
+def test_card_goes_before_text_and_is_not_repeated_on_retry(tmp_path):
+    checked = tmp_path / "checked"
+    checked.mkdir()
+    (checked / "ok-1.md").write_text(render_verdict(claim("ok-1"), verdict()))
+
+    class FlakyBot(FakeBot):
+        fails = 1
+
+        async def send_message(self, chat_id, text, **kw):
+            if chat_id == "@canal" and self.fails:
+                self.fails -= 1
+                raise RuntimeError("timeout")
+            return await super().send_message(chat_id, text, **kw)
+
+    bot = FlakyBot()
+    r = reviewer(tmp_path, bot)
+
+    async def go():
+        await scan_checks(r, checked, None, tmp_path / "cards", "@canal")
+        first = await r.decide(PUBLISH, short_key("ok-1"), OPERATOR, "Ana")
+        second = await r.decide(PUBLISH, short_key("ok-1"), OPERATOR, "Ana")
+        return first, second
+
+    first, second = asyncio.run(go())
+    assert "Falha ao publicar" in first and second == "✅ Publicado"
+    assert (tmp_path / "cards" / "ok-1.png").read_bytes().startswith(b"\x89PNG")
+    kinds = [(c, "foto" if t == "<foto>" else "texto") for c, t, _ in bot.sent]
+    assert kinds == [(42, "foto"), (42, "texto"), ("@canal", "foto"), ("@canal", "texto")]
 
 
 # --- resumo e CLI -----------------------------------------------------------------------------

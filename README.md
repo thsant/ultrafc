@@ -145,6 +145,11 @@ pixi run publish --channel @meu_canal --review-chat <id> --operators <id1,id2> -
 ```
 - **Checagens:** cada arquivo novo em `checking/checked/` vira um rascunho (resultado com ícone, quem,
   afirmação, justificativa resumida e até 5 fontes consultadas). Resultados `erro` não vão para revisão.
+- **Cards:** antes do texto vai um card quadrado (1080×1080 PNG), pronto para Instagram e WhatsApp: faixa na
+  cor do resultado (verde verdadeiro, vermelho falso, laranja exagerado, amarelo omissão, cinza
+  inconclusivo), quem disse, a afirmação, o resumo de 1–2 frases escrito pelo checador e revisado, os
+  domínios das fontes e, no rodapé, o @nome do canal (`--card-brand` troca) e o `--footer`. Os PNGs ficam
+  em `checking/cards/`. `--no-cards` publica só o texto.
 - **Resumos:** a cada `--summary-minutes` (padrão 10), com pelo menos 8 falas novas, o `claude-sonnet-5-5`
   escreve um resumo neutro em tópicos, atribuído aos falantes; fica em `checking/summaries/` e também passa
   pela revisão. `--no-summary` desliga.

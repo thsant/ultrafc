@@ -42,6 +42,7 @@ class Verdict:
     fontes: list[Source] = field(default_factory=list)
     modelo: str = ""
     checado_em: str = ""
+    resumo: str = ""  # 1 a 2 frases para o card; vazio em checagens antigas
 
 
 @dataclass
@@ -102,7 +103,9 @@ def render_verdict(c: Claim, v: Verdict, r: Review | None = None) -> str:
         + ("" if s.consultada else " *(não consultada pelo agente)*")
         for i, s in enumerate(v.fontes, 1)) or "Nenhuma."
     return (fm + "\n" + _claim_body(c)
-            + f"\n## Resultado: {v.resultado.upper()}\n\n## Justificativa\n{v.justificativa.strip()}\n"
+            + f"\n## Resultado: {v.resultado.upper()}\n"
+            + (f"\n## Resumo\n{v.resumo.strip()}\n" if v.resumo.strip() else "")
+            + f"\n## Justificativa\n{v.justificativa.strip()}\n"
             + f"\n## Fontes consultadas\n{fontes}\n"
             + ("" if r is None else f"\n## Revisão\n{r.motivo.strip()}\n"))
 
@@ -139,7 +142,7 @@ def parse_verdict(text: str) -> tuple[Claim, Verdict]:
               for line in sections.get("Fontes consultadas", "").splitlines()
               if (m := _SOURCE.match(line.strip()))]
     verdict = Verdict(fields.get("resultado", ""), sections.get("Justificativa", ""), fontes,
-                      fields.get("modelo", ""), fields.get("checado_em", ""))
+                      fields.get("modelo", ""), fields.get("checado_em", ""), sections.get("Resumo", ""))
     return claim, verdict
 
 

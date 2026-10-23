@@ -60,6 +60,16 @@ def test_verdict_file_has_required_sections():
     assert parse_review(md) is None
 
 
+def test_verdict_summary_roundtrip_and_in_tool_and_review_prompt():
+    v = Verdict("falso", "Justificativa longa.", [], "m", "t", "Resumo curto para o card.")
+    md = render_verdict(claim(), v)
+    assert "## Resumo\nResumo curto para o card." in md and parse_verdict(md)[1] == v
+    old = render_verdict(claim(), Verdict("falso", "J", [], "m", "t"))
+    assert "## Resumo" not in old and parse_verdict(old)[1].resumo == ""
+    assert "resumo" in checker.VERDICT_TOOL["input_schema"]["required"]
+    assert "Resumo para o card: Resumo curto para o card." in reviewer.build_prompt(claim(), v)
+
+
 def test_verdict_with_review_roundtrip():
     v = Verdict("falso", "Registros mostram outro resultado.",
                 [Source("Alerj", "https://alerj.rj.gov.br/x", "lista de votação")], "claude-haiku-5-5", "t1")
