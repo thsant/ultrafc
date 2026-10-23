@@ -2,14 +2,39 @@
 
 from __future__ import annotations
 
+import re
 import time
+from dataclasses import dataclass
 from pathlib import Path
+
+TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+# Falante: até 40 caracteres sem ":" (nomes do people.txt, P1..PN ou "?").
+_LINE = re.compile(r"^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\] (?:([^:\[\]]{1,40}): )?(.*)$")
 
 
 def format_line(ts: float, text: str, speaker: str | None = None) -> str:
     if speaker:
         text = f"{speaker}: {text}"
-    return f"[{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ts))}] {text}"
+    return f"[{time.strftime(TIME_FORMAT, time.localtime(ts))}] {text}"
+
+
+@dataclass
+class LogLine:
+    ts: float
+    speaker: str | None
+    text: str
+
+    def __str__(self) -> str:
+        return format_line(self.ts, self.text, self.speaker)
+
+
+def parse_line(line: str) -> LogLine | None:
+    """Inverso de `format_line`; None se a linha não está no formato do log."""
+    m = _LINE.match(line.rstrip("\n"))
+    if not m:
+        return None
+    ts = time.mktime(time.strptime(m.group(1), TIME_FORMAT))
+    return LogLine(ts, m.group(2), m.group(3))
 
 
 class TranscriptLog:
