@@ -99,11 +99,14 @@ pixi run check --log-dir logs/<stream>        # em outro terminal, junto com o p
 1. **Detecção** (`claude-sonnet-5-5`, com raciocínio): a cada 6 linhas novas (ou 45 s), analisa o trecho com
    10 linhas de contexto e grava cada afirmação verificável em `checking/to_check/<id>.md` (afirmação, quem
    disse, horário, fala literal e por que checar).
-2. **Checagem** (`claude-opus-5-5` com busca e leitura de páginas na web): até 3 agentes em paralelo
-   (`--max-parallel`), um por afirmação; os demais esperam na fila. O resultado vai para
-   `checking/checked/<id>.md`: resultado, justificativa e fontes. Uma fonte citada
-   pelo agente que não apareceu na pesquisa dele é marcada *(não consultada pelo agente)*. Uma falha
-   gera `resultado: erro` com o motivo.
+2. **Checagem** (`claude-haiku-5-5` com busca e leitura de páginas na web): até 3 agentes em paralelo
+   (`--max-parallel`), um por afirmação; os demais esperam na fila. Uma fonte citada pelo agente que não
+   apareceu na pesquisa dele é marcada *(não consultada pelo agente)*. Uma falha gera `resultado: erro`
+   com o motivo (vai para `checked/`, mas não é publicada).
+3. **Revisão** (`claude-opus-5-5`, `--review-model`): confere o veredito relendo só as fontes que o
+   checador citou, sem pesquisar outras (até 5 mil tokens por página). Aprovado, vai para
+   `checking/checked/<id>.md` (resultado, justificativa, fontes e a nota da revisão); reprovado, ou se a
+   revisão falhar, vai para `checking/rejected/<id>.md` e nunca é publicado.
 
    | Resultado | Quando |
    |---|---|
@@ -117,6 +120,8 @@ Precisa de `ANTHROPIC_API_KEY` no ambiente (exportada no topo do `~/.bashrc`, an
 interrompe shells não interativos). Por padrão só analisa o que for escrito depois de iniciar; `--from-start`
 analisa o log todo, `--once` sai ao terminar, e `--stop-after N` limita o número de afirmações (útil para
 testar com custo controlado). Ao reiniciar, continua de onde parou e retoma as afirmações sem resultado.
+O uso da API (tokens, buscas e custo estimado por modelo) é gravado a cada checagem em
+`checking/usage/<stream>-<início>.json`, e o do publish em `checking/usage/publish-<início>.json`.
 
 É uma triagem automática: os vereditos devem ser revisados por uma pessoa antes de qualquer publicação.
 

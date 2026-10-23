@@ -16,6 +16,7 @@ from ..console import make_consoles, setup_logging
 from ..logger import TIME_FORMAT, LogLine
 from . import check as checker
 from . import detect as detector
+from . import review as reviewer
 from . import usage
 from .files import Claim, new_id, parse_claim, pending, render_claim, render_verdict, write_atomic
 from .tail import LogTail
@@ -23,7 +24,8 @@ from .tail import LogTail
 log = logging.getLogger("ultrafc.factcheck")
 
 RESULT_STYLE = {"verdadeiro": "bold green", "falso": "bold red", "exagerado": "bold dark_orange",
-                "omissão": "bold yellow", "inconclusivo": "bold blue", "erro": "bold magenta"}
+                "omissão": "bold yellow", "inconclusivo": "bold blue", "erro": "bold magenta",
+                "rejeitado": "bold bright_black"}
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -34,6 +36,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--out", type=Path, default=Path("checking"), help="pasta de saída (padrão: checking)")
     p.add_argument("--detect-model", default=detector.DEFAULT_MODEL)
     p.add_argument("--check-model", default=checker.DEFAULT_MODEL)
+    p.add_argument("--review-model", default=reviewer.DEFAULT_MODEL,
+                   help="confere cada checagem só com as fontes citadas; reprovadas vão para rejected/")
     p.add_argument("--max-parallel", type=int, default=3, help="checagens simultâneas (padrão: 3)")
     p.add_argument("--window-lines", type=int, default=6, help="linhas novas que disparam a detecção")
     p.add_argument("--window-seconds", type=float, default=45.0,
@@ -55,6 +59,7 @@ class FactChecker:
         self.console = console
         self.todo_dir = args.out / "to_check"
         self.done_dir = args.out / "checked"
+        self.rejected_dir = args.out / "rejected"
         source = args.log_dir or args.log
         self.stream = (args.log_dir or args.log.parent).name
         self.tail = LogTail(source, args.out / f".state-{self.stream}.json", args.from_start)
@@ -62,6 +67,9 @@ class FactChecker:
         self.known: list[str] = []
         self.registered = 0
         self.running = 0
+        self.counts: collections.Counter = collections.Counter()
+        self.started = time.strftime(TIME_FORMAT)
+        self.usage_path = args.out / "usage" / f"{self.stream}-{time.strftime('%Y%m%d-%H%M%S')}.json"
 
     @property
     def stopped(self) -> bool:
@@ -119,16 +127,33 @@ class FactChecker:
                 verdict = await checker.check(self.client, self.args.check_model, claim)
             except Exception as exc:  # noqa: BLE001 - o erro vira um resultado registrado, não some
                 verdict = checker._error(self.args.check_model, f"falha na checagem: {exc}")
-            write_atomic(self.done_dir / f"{claim.id}.md", render_verdict(claim, verdict))
-            self.show(claim, verdict.resultado)
+            rev = None
+            if verdict.resultado != "erro":  # erro não tem o que revisar e não é publicado
+                try:
+                    rev = await reviewer.review(self.client, self.args.review_model, claim, verdict)
+                except Exception as exc:  # noqa: BLE001 - sem revisão, não publica
+                    rev = reviewer._rejected(self.args.review_model, f"falha na revisão: {exc}")
+            directory = self.done_dir if rev is None or rev.aprovado else self.rejected_dir
+            path = directory / f"{claim.id}.md"
+            write_atomic(path, render_verdict(claim, verdict, rev))
+            self.counts["checagens"] += 1
+            self.counts["erros" if rev is None else "aprovadas" if rev.aprovado else "rejeitadas"] += 1
+            self.save_usage()
+            self.show(claim, verdict.resultado, path, rev)
             self.running -= 1
             self.queue.task_done()
 
-    def show(self, claim: Claim, resultado: str) -> None:
-        line = Text(f"{resultado.upper():>10}  ", style=RESULT_STYLE.get(resultado, "bold"))
+    def save_usage(self) -> None:
+        usage.save(self.usage_path, stream=self.stream, inicio=self.started, **self.counts)
+
+    def show(self, claim: Claim, resultado: str, path, rev=None) -> None:
+        label = resultado if rev is None or rev.aprovado else "rejeitado"
+        line = Text(f"{label.upper():>10}  ", style=RESULT_STYLE.get(label, "bold"))
         line.append(f"{claim.quem}: ", style="bold")
         line.append(claim.afirmacao)
-        line.append(f"  → {self.done_dir / claim.id}.md", style="dim")
+        if label == "rejeitado":
+            line.append(f" ({resultado}; {rev.motivo[:120]})", style="dim")
+        line.append(f"  → {path}", style="dim")
         self.console.print(line)
 
     async def run(self) -> None:
@@ -151,6 +176,7 @@ class FactChecker:
         finally:
             for w in workers:
                 w.cancel()
+            self.save_usage()
 
 
 def main(argv: list[str] | None = None) -> None:

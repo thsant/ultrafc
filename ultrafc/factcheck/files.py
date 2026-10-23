@@ -1,4 +1,4 @@
-"""Arquivos .md da checagem: pendências em to_check/ e resultados em checked/."""
+"""Arquivos .md da checagem: pendências em to_check/, resultados aprovados em checked/ e reprovados em rejected/."""
 
 from __future__ import annotations
 
@@ -44,6 +44,14 @@ class Verdict:
     checado_em: str = ""
 
 
+@dataclass
+class Review:
+    aprovado: bool
+    motivo: str
+    modelo: str = ""
+    revisado_em: str = ""
+
+
 def _one_line(text: str) -> str:
     return " ".join(text.split())
 
@@ -82,16 +90,21 @@ def render_claim(c: Claim) -> str:
             + "\n" + _claim_body(c) + f"\n## Por que checar\n{c.rationale.strip()}\n")
 
 
-def render_verdict(c: Claim, v: Verdict) -> str:
-    fm = _frontmatter({"id": c.id, "stream": c.stream, "quem": c.quem, "horario": c.horario,
-                       "resultado": v.resultado, "checado_em": v.checado_em, "modelo": v.modelo})
+def render_verdict(c: Claim, v: Verdict, r: Review | None = None) -> str:
+    fields = {"id": c.id, "stream": c.stream, "quem": c.quem, "horario": c.horario,
+              "resultado": v.resultado, "checado_em": v.checado_em, "modelo": v.modelo}
+    if r is not None:
+        fields |= {"revisao": "aprovada" if r.aprovado else "reprovada", "revisor": r.modelo,
+                   "revisado_em": r.revisado_em}
+    fm = _frontmatter(fields)
     fontes = "\n".join(
         f"{i}. [{_one_line(s.titulo) or s.url}]({s.url}) — {_one_line(s.o_que_sustenta)}"
         + ("" if s.consultada else " *(não consultada pelo agente)*")
         for i, s in enumerate(v.fontes, 1)) or "Nenhuma."
     return (fm + "\n" + _claim_body(c)
             + f"\n## Resultado: {v.resultado.upper()}\n\n## Justificativa\n{v.justificativa.strip()}\n"
-            + f"\n## Fontes consultadas\n{fontes}\n")
+            + f"\n## Fontes consultadas\n{fontes}\n"
+            + ("" if r is None else f"\n## Revisão\n{r.motivo.strip()}\n"))
 
 
 def _sections(text: str) -> tuple[dict[str, str], dict[str, str]]:
@@ -119,7 +132,7 @@ _SOURCE = re.compile(r"^\d+\. \[(.*?)\]\((.*?)\) — (.*?)( \*\(não consultada 
 
 
 def parse_verdict(text: str) -> tuple[Claim, Verdict]:
-    """Inverso de `render_verdict`."""
+    """Inverso de `render_verdict` (sem a revisão; ver `parse_review`)."""
     fields, sections = _sections(text)
     claim = parse_claim(text)
     fontes = [Source(m.group(1), m.group(2), m.group(3), m.group(4) is None)
@@ -130,13 +143,21 @@ def parse_verdict(text: str) -> tuple[Claim, Verdict]:
     return claim, verdict
 
 
+def parse_review(text: str) -> Review | None:
+    fields, sections = _sections(text)
+    if "revisao" not in fields:
+        return None
+    return Review(fields["revisao"] == "aprovada", sections.get("Revisão", ""), fields.get("revisor", ""),
+                  fields.get("revisado_em", ""))
+
+
 def pending(out: Path) -> list[Claim]:
-    """Afirmações em to_check/ que ainda não têm resultado em checked/, em ordem de id."""
-    todo, done = out / "to_check", out / "checked"
+    """Afirmações em to_check/ que ainda não têm resultado em checked/ nem em rejected/, em ordem de id."""
+    todo, done = out / "to_check", (out / "checked", out / "rejected")
     if not todo.exists():
         return []
     return [parse_claim(p.read_text(encoding="utf-8")) for p in sorted(todo.glob("*.md"))
-            if not (done / p.name).exists()]
+            if not any((d / p.name).exists() for d in done)]
 
 
 def now() -> str:

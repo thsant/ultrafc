@@ -11,7 +11,7 @@ from .files import RESULTS, Claim, Source, Verdict, now
 
 log = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "claude-opus-5-5"
+DEFAULT_MODEL = "claude-haiku-5-5"
 MAX_TURNS = 8  # inclui retomadas de pause_turn e lembretes para registrar o veredito
 
 VERDICT_TOOL = {
@@ -44,11 +44,25 @@ VERDICT_TOOL = {
     },
 }
 
-TOOLS = [
-    {"type": "web_search_20260209", "name": "web_search", "max_uses": 8},
-    {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 6},
-    VERDICT_TOOL,
-]
+# Modelos com as versões das ferramentas web que filtram os resultados antes de entrarem no contexto;
+# os demais (Haiku) usam as versões básicas.
+DYNAMIC_FILTERING = ("claude-opus-", "claude-sonnet-", "claude-fable-")
+# Sem fallback server-side: no Haiku um pedido recusado continua recusado e a lista de modelos dá 400.
+NO_FALLBACK = ("claude-haiku-",)
+
+
+def web_tools(model: str, search_uses: int, fetch_uses: int, **fetch_opts) -> list[dict]:
+    new = model.startswith(DYNAMIC_FILTERING)
+    tools = [{"type": "web_search_20260209" if new else "web_search_20250305", "name": "web_search",
+              "max_uses": search_uses}] if search_uses else []
+    return tools + [{"type": "web_fetch_20260209" if new else "web_fetch_20250910", "name": "web_fetch",
+                     "max_uses": fetch_uses, **fetch_opts}]
+
+
+def fallback_options(model: str) -> dict:
+    if model.startswith(NO_FALLBACK):
+        return {}
+    return {"betas": [FALLBACK_BETA], "fallbacks": "default"}
 
 SYSTEM = """\
 Você é um checador de fatos. Recebe uma afirmação feita numa transmissão ao vivo, transcrita \
@@ -110,12 +124,11 @@ async def check(client, model: str, claim: Claim) -> Verdict:
         response = await client.beta.messages.create(
             model=model,
             max_tokens=16000,
-            betas=[FALLBACK_BETA],
-            fallbacks="default",
+            **fallback_options(model),
             thinking={"type": "adaptive"},
             output_config={"effort": "high"},
             system=SYSTEM,
-            tools=TOOLS,
+            tools=[*web_tools(model, 8, 6), VERDICT_TOOL],
             messages=messages,
         )
         usage.record(model, response.usage)

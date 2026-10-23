@@ -7,6 +7,7 @@ import asyncio
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 from rich_argparse import RichHelpFormatter
@@ -73,7 +74,7 @@ async def scan_checks(reviewer: Reviewer, checked: Path, footer: str | None) -> 
         await reviewer.submit(item_id, "checagem", format_check(claim, verdict, footer))
 
 
-async def summaries(reviewer: Reviewer, client, args, tail: LogTail, out: Path) -> None:
+async def summaries(reviewer: Reviewer, client, args, tail: LogTail, out: Path, usage_path: Path) -> None:
     buffer = []
     while True:
         await asyncio.sleep(args.summary_minutes * 60)
@@ -87,6 +88,8 @@ async def summaries(reviewer: Reviewer, client, args, tail: LogTail, out: Path) 
         except Exception as exc:  # noqa: BLE001 - tenta de novo no próximo ciclo com o mesmo trecho
             log.warning("falha ao gerar resumo: %s", exc)
             continue
+        finally:
+            usage.save(usage_path)
         if topics:
             summarizer.save(out, item_id, args.log_dir.name, start, end, topics)
             await reviewer.submit(item_id, "resumo", format_summary(start, end, topics, args.footer))
@@ -152,6 +155,7 @@ def main(argv: list[str] | None = None) -> None:
     from telegram.ext import Application, CallbackQueryHandler
 
     operators = {int(x) for x in args.operators.split(",") if x.strip()}
+    usage_path = args.checking / "usage" / f"publish-{time.strftime('%Y%m%d-%H%M%S')}.json"
     tasks: list[asyncio.Task] = []
 
     # Antes de subir o bot: um SystemExit dentro do post_init seria tratado pela biblioteca como
@@ -183,7 +187,7 @@ def main(argv: list[str] | None = None) -> None:
 
             tail = LogTail(args.log_dir, args.checking / f".publish-tail-{args.log_dir.name}.json", args.from_start)
             tasks.append(asyncio.create_task(summaries(reviewer, anthropic.AsyncAnthropic(max_retries=4), args,
-                                                       tail, args.checking / "summaries")))
+                                                       tail, args.checking / "summaries", usage_path)))
         log.info("publicando em %s; rascunhos em %s; %d operador(es)", args.channel, args.review_chat,
                  len(operators))
 
@@ -192,6 +196,7 @@ def main(argv: list[str] | None = None) -> None:
             t.cancel()
         for line in usage.summary():
             log.info("uso: %s", line)
+        usage.save(usage_path)
 
     async def on_click(update: Update, context) -> None:
         query = update.callback_query
