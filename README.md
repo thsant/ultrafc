@@ -1,3 +1,5 @@
+<img src="docs/mascot-512px.png" alt="Mascote do ultrafc: um carcará detetive, com chapéu de Sherlock Holmes e lupa" width="160" align="right">
+
 # ultrafc — transcrição, falantes, checagem de fatos e publicação de lives
 
 O **ultrafc** acompanha uma transmissão em vídeo (YouTube, Instagram, G1/Globoplay, Twitch, HLS, RTMP, UDP…)
