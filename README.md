@@ -9,15 +9,14 @@ e cobre quatro etapas:
    agentes com busca na web as checam em paralelo;
 4. **Publicação** das checagens e de resumos num canal do **Telegram**, sempre com aprovação de um operador.
 
-```
-URL ──yt-dlp──▶ ffmpeg ──▶ VAD ──▶ Whisper + falantes ──▶ logs/<stream>/<data>.log      (pixi run tx)
-                                                                │
-                                         detecção ──▶ checagem na web ──▶ checking/      (pixi run check)
-                                                                                 │
-                                         resumos ──▶ revisão do operador ──▶ canal do Telegram (pixi run publish)
-```
+![Fluxo do ultrafc: pixi run tx transcreve e identifica falantes; pixi run check detecta e checa afirmações; pixi run publish envia checagens e resumos para revisão e publica no Telegram](docs/pipeline.svg)
 
 Cada etapa é um processo separado que lê a saída da anterior; dá para usar só a transcrição.
+
+![Dois terminais durante o debate da Band: à esquerda, a transcrição com o horário e o nome de cada falante; à direita, a checagem de fatos com as afirmações detectadas, as checagens em andamento e os resultados coloridos (verdadeiro, omissão, exagerado, inconclusivo)](docs/screenshot.png)
+
+*Debate da Band ([vídeo](https://www.youtube.com/watch?v=RugVB17uRVM)): à esquerda, `pixi run tx` com os falantes já
+nomeados pelo `people.txt`; à direita, `pixi run check` detectando afirmações e checando até 3 em paralelo.*
 
 ## Instalação
 ```
