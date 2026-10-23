@@ -1,4 +1,4 @@
-"""Mensagens do canal em HTML do Telegram: checagens e resumos."""
+"""Mensagens do canal em HTML do Telegram: checagens (nossas e de agências), resumos e Procure saber!."""
 
 from __future__ import annotations
 
@@ -7,10 +7,12 @@ from html import escape
 
 from ..factcheck.files import Claim, Verdict
 from ..logger import TIME_FORMAT
+from ..saber.files import Materia, speaker_name
 
 MAX_MESSAGE = 4096  # limite do Telegram para uma mensagem de texto
 MAX_JUSTIFICATION = 900
 MAX_SOURCES = 5
+MAX_TEXT = 1500  # texto do Procure saber!
 
 ICONS = {"verdadeiro": "✅", "falso": "❌", "exagerado": "🟠", "omissão": "🟡", "inconclusivo": "⚪"}
 
@@ -60,3 +62,31 @@ def format_summary(start: float, end: float, bullets: list[str], footer: str | N
     while items and len(head) + len("\n".join(items)) + len(tail) > MAX_MESSAGE:
         items.pop()  # corta tópicos inteiros, nunca no meio de uma tag HTML
     return head + "\n".join(items) + tail
+
+
+def format_saber(m: Materia, footer: str | None = None) -> str:
+    """Procure saber!: a matéria, o que foi dito a que ela se liga e o link."""
+    titulo, veiculo = escape(m.titulo.strip() or m.chamada.strip()), escape(m.veiculo.strip())
+    head = f"🔎 <b>Procure saber!</b>\n<b>{titulo}</b>" + (f" — {veiculo}" if veiculo else "") + "\n\n"
+    falas = "".join(f"\n🗣 <i>{escape(speaker_name(f.quem))}, {f.horario[11:16]}:</i> «{escape(f.trecho)}»"
+                    for f in m.falas)
+    link = (f'<a href="{escape(m.url, quote=True)}">Leia a matéria' + (f" em {veiculo}" if veiculo else "")
+            + "</a>")
+    tail = (f"\n{falas}" if falas else "") + f"\n\n{link}" + _footer(footer, "#procuresaber")
+    budget = min(MAX_TEXT, MAX_MESSAGE - len(head) - len(tail) - 10)
+    return head + escape(trim_paragraphs(m.texto, budget)) + tail
+
+
+def format_agency_check(m: Materia, footer: str | None = None) -> str:
+    """Checagem de uma agência, no formato das nossas, com o selo e o crédito da apuração."""
+    agency, who = escape(m.veiculo.strip()), escape(m.quem_afirmou.strip())  # o autor segundo a agência
+    head = (f"{ICONS.get(m.categoria, '•')} <b>{escape(m.selo.strip().upper())}</b> · checagem de {agency}\n"
+            + (f"{who}\n" if who else "") + f"«{escape(m.afirmacao.strip())}»\n\n")
+    falas = "".join(f"\n🗣 <i>{escape(speaker_name(f.quem))}, {f.horario[11:16]}:</i> «{escape(f.trecho)}»"
+                    for f in m.falas)
+    falas = f"\n<b>Na transmissão:</b>{falas}" if falas else ""
+    credit = (f'<b>Apuração:</b> <a href="{escape(m.url, quote=True)}">{agency}</a>'
+              + (f", por {escape(m.autoria.strip())}" if m.autoria.strip() else ""))
+    tail = (f"\n{falas}" if falas else "") + f"\n\n{credit}" + _footer(footer, "#checagem")
+    budget = min(MAX_JUSTIFICATION, MAX_MESSAGE - len(head) - len(tail) - 10)
+    return head + escape(trim_paragraphs(m.texto, budget)) + tail

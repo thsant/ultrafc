@@ -11,7 +11,10 @@ e cobre quatro etapas:
    agentes com busca na web as checam em paralelo;
 4. **Publicação** das checagens e de resumos num canal do **Telegram**, sempre com aprovação de um operador.
 
-![Fluxo do ultrafc: pixi run tx transcreve e identifica falantes; pixi run check detecta e checa afirmações; pixi run publish envia checagens e resumos para revisão e publica no Telegram](docs/pipeline.svg)
+E uma ferramenta à parte, o **Procure saber!**: o operador cola a URL de uma matéria jornalística e o Claude
+escreve um card + texto que divulga a matéria e a liga ao que foi dito na transmissão.
+
+![Fluxo do ultrafc: pixi run tx transcreve e identifica falantes; pixi run check detecta e checa afirmações; pixi run publish envia checagens e resumos para revisão e publica no Telegram; pixi run saber liga matérias e checagens de agências ao que foi dito e as envia para revisão num segundo bot](docs/pipeline.svg)
 
 Cada etapa é um processo separado que lê a saída da anterior; dá para usar só a transcrição.
 
@@ -157,6 +160,61 @@ pixi run publish --channel @meu_canal --review-chat <id> --operators <id1,id2> -
   pela revisão. `--no-summary` desliga.
 - Só os ids em `--operators` podem aprovar. O que foi enviado, publicado ou descartado fica em
   `checking/.publish-state.json`: um reinício não reenvia nem publica duas vezes.
+
+## Procure saber!
+Matérias jornalísticas e conteúdos informativos mais longos que dão contexto ao que foi dito na transmissão.
+O operador cola a URL e o trabalho é feito em dois passos:
+1. **Leitura** (`claude-haiku-5-5`, `--fetch-model`): lê só essa página, com `web_fetch`, sem a transcrição e
+   sem outras buscas. Custa menos de US$ 0,01.
+2. **Análise** (`claude-sonnet-5-5`, `--model`): recebe a transcrição e o texto da matéria, procura quem falou
+   sobre o assunto e escreve um card + texto para o canal, que passam pela mesma revisão com ✅ Publicar /
+   ❌ Descartar do `publish`.
+
+**Sites que não deixam o Claude ler.** Vários veículos bloqueiam a leitura por IA (o `web_fetch` devolve
+`url_not_allowed`): em outubro de 2026, g1, O Globo, Valor, Folha, UOL, piauí, Estadão, Veja, BBC Brasil e
+GZH. Agência Brasil, Poder360, Metrópoles, CNN Brasil, Correio Braziliense, Terra, Exame, CartaCapital, Nexo,
+Agência Pública, Intercept Brasil e Aos Fatos são lidos normalmente. Quando a leitura falha, o terminal pede o
+texto: cole a matéria (de onde a equipe tem acesso) e termine com uma linha só com `.`; `pular` desiste dela.
+Um site que recusou não é tentado de novo na mesma sessão: as próximas URLs dele já pedem o texto.
+```
+⚠ noticias.uol.com.br não permite a leitura por IA: https://noticias.uol.com.br/…
+ⓘ 📋 cole o texto da matéria e termine com uma linha só com "." (ou digite "pular")
+<cole o texto>
+.
+```
+
+Usa um **segundo bot** (dois processos não podem receber os cliques do mesmo bot): crie outro no
+**@BotFather**, adicione-o como administrador do canal e ponha no topo do `~/.bashrc`
+`export TELEGRAM_SABER_BOT_TOKEN="..."` (`--token-env` troca o nome da variável). `pixi run saber --whoami`
+mostra os ids, como no `publish`.
+```
+pixi run saber logs/<stream>/2026-10-22.log --channel @meu_canal --review-chat <id> --operators <id1,id2> \
+    --footer "Conteúdo selecionado pela equipe"
+```
+Depois, cole uma URL por linha no terminal e responda se é uma **matéria** ou uma **checagem** de agência
+(`m`/Enter ou `c`; por pipe, uma linha com a URL e outra com a resposta). O primeiro argumento pode ser o
+arquivo de log ou a pasta `logs/<stream>` (usa o log mais recente); a transcrição é relida a cada URL.
+
+- **Texto:** título e veículo, 2–4 parágrafos (o que a matéria informa, atribuído ao veículo, e a ligação com
+  o que foi dito), até 3 falas da transmissão com quem e horário, o link da matéria e `#procuresaber`. É
+  neutro: não diz se uma fala é verdadeira ou falsa (isso é papel da checagem).
+- **Checagem de agência** (Aos Fatos, Lupa…): sai no formato das nossas checagens, com crédito. A faixa
+  traz o **selo exato da agência** (ex.: FALSO, DISTORCIDO, MENTE) na cor da nossa categoria mais próxima, o
+  card leva "Apuração: Aos Fatos · por <autores>" e o texto, o link da checagem com os autores e `#checagem`.
+  A afirmação vem com o autor segundo a agência (pessoa, post viral…). Se alguém falou do assunto na
+  transmissão, a fala aparece à parte ("Na transmissão, Fulano · 22:11: …"); se não, a checagem sai do mesmo
+  jeito. O texto relata a apuração da agência, sem refazê-la. Uma página que não é checagem não vai para
+  revisão.
+- **Card** 1080×1080 em `checking/cards/`: faixa "Procure saber!" com o carcará leitor, veículo e data,
+  chamada, resumo, a fala principal e o site da matéria. `--no-cards` publica só o texto.
+- **Conferência das falas:** cada trecho citado pelo modelo é procurado na transcrição (sem diferença de
+  caixa, acentos e pontuação); quem e horário vêm do log, e um trecho que não está lá é descartado. Sem
+  nenhuma fala encontrada, ou se o modelo não vê ligação clara, a matéria não vai para revisão e o motivo
+  aparece no terminal. O mesmo vale se o texto recebido não for a matéria (página de login, de erro ou
+  só o começo de um texto fechado).
+- A análise fica em `checking/saber/<id>.md` (com `tipo: materia` ou `checagem` e `origem: web` ou `colado`; o texto colado fica ao lado, em
+  `<id>.txt`), o estado da revisão em `checking/.saber-state.json` (uma URL já
+  enviada não é analisada de novo) e o uso da API em `checking/usage/saber-<início>.json`.
 
 ## Áudio do computador
 Se a stream não abre (yt-dlp/streamlink falham), abra a transmissão no navegador e transcreva o som que sai
