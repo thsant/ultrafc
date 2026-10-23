@@ -1,0 +1,4 @@
+# Nomes dos falantes, relido a cada 10 s durante a transcrição.
+# Copie para people.txt e ajuste: <rótulo do log>:<nome>
+P1:Flávio Bolsonaro
+P2:Lula

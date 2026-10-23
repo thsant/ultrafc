@@ -1,0 +1,27 @@
+[workspace]
+name = "livetx"
+channels = ["conda-forge"]
+platforms = [{ platform = "linux-64", cuda = "12" }]
+
+[dependencies]
+python = "3.12.*"
+ffmpeg = "*"
+yt-dlp = "*"
+numpy = "*"
+pytest = "*"
+rich = "*"
+rich-argparse = "*"
+cuda-version = "12.*"
+cudnn = "9.*"
+libcublas = "*"
+
+[pypi-dependencies]
+faster-whisper = ">=1.1"
+streamlink = "*"
+sherpa-onnx = "*"
+livetx = { path = ".", editable = true }
+
+[tasks]
+tx = "python -m livetx"
+test = "pytest -q tests"
+check-cuda = "python -c 'import ctranslate2; print(ctranslate2.get_cuda_device_count())'"
