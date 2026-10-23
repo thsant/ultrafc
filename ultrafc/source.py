@@ -21,6 +21,7 @@ log = logging.getLogger(__name__)
 
 # Protocolos que o ffmpeg abre diretamente, sem passar por yt-dlp/streamlink.
 _DIRECT_SCHEMES = {"udp", "rtp", "rtmp", "rtmps", "rtsp", "srt", "tcp", "file"}
+_PULSE = "pulse:"  # áudio do computador: pulse: (som da saída padrão) ou pulse:<fonte>
 _DIRECT_SUFFIXES = (".m3u8", ".mpd", ".ts", ".flv", ".mp3", ".aac", ".wav", ".mp4", ".mkv")
 
 
@@ -30,6 +31,7 @@ class Media:
     headers: dict[str, str] = field(default_factory=dict)
     slug: str = "stream"
     is_live: bool = True
+    input_format: str | None = None  # "-f" do ffmpeg, para dispositivos (ex.: pulse)
 
 
 @dataclass
@@ -91,8 +93,22 @@ def _resolve_streamlink(url: str, opts: ResolverOptions) -> Media:
     return Media(url=out.stdout.strip(), slug=_slug_from_url(url))
 
 
+def default_monitor() -> str:
+    """Fonte Pulse/PipeWire com o som que sai na saída padrão (não o microfone, que é a fonte "default")."""
+    try:
+        out = subprocess.run(["pactl", "get-default-sink"], capture_output=True, text=True, timeout=10)
+    except FileNotFoundError:
+        out = None
+    if out is None or out.returncode != 0 or not out.stdout.strip():
+        raise RuntimeError("não achei a saída de áudio padrão; informe a fonte em pulse:<fonte> "
+                           "(veja `pactl list short sources`, a que termina em .monitor)")
+    return out.stdout.strip() + ".monitor"
+
+
 def resolve(url: str, opts: ResolverOptions) -> Media:
     """Converte a URL da página (YouTube, Instagram...) na URL de mídia que o ffmpeg abre."""
+    if url.startswith(_PULSE):
+        return Media(url=url[len(_PULSE):] or default_monitor(), slug="audio-local", input_format="pulse")
     if opts.resolver == "direct" or _is_direct(url):
         return Media(url=url, slug=_slug_from_url(url), is_live=not os.path.exists(url))
     if opts.resolver == "streamlink":
@@ -106,6 +122,8 @@ def ffmpeg_command(media: Media) -> list[str]:
         cmd += ["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10"]
         if media.headers:
             cmd += ["-headers", "".join(f"{k}: {v}\r\n" for k, v in media.headers.items())]
+    if media.input_format:
+        cmd += ["-f", media.input_format]
     cmd += ["-i", media.url, "-vn", "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "s16le", "-"]
     return cmd
 

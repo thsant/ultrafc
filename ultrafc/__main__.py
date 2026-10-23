@@ -24,7 +24,8 @@ log = logging.getLogger("ultrafc")
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="ultrafc", description=__doc__, formatter_class=RichHelpFormatter)
-    p.add_argument("url", help="URL da live (YouTube, Instagram, G1...), .m3u8, udp://, rtmp:// ou arquivo")
+    p.add_argument("url", help="URL da live (YouTube, Instagram, G1...), .m3u8, udp://, rtmp://, arquivo, "
+                                 "ou pulse: para o áudio do computador (pulse:<fonte> para outra fonte)")
     p.add_argument("--out-dir", default="logs", help="diretório base dos logs (padrão: logs)")
     p.add_argument("--name", help="nome da subpasta do log (padrão: derivado da stream)")
     p.add_argument("--model", default="small", help="modelo Whisper: tiny, base, small, medium, large-v3, turbo...")

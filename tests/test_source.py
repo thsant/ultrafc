@@ -18,6 +18,23 @@ def test_ffmpeg_command_adds_http_options_and_headers():
     assert "-reconnect" not in ffmpeg_command(Media("udp://127.0.0.1:1"))
 
 
+def test_pulse_input_uses_given_source_or_default_monitor(monkeypatch):
+    m = resolve("pulse:x.monitor", ResolverOptions())
+    assert (m.url, m.input_format, m.is_live) == ("x.monitor", "pulse", True)
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="sink1\n", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert resolve("pulse:", ResolverOptions()).url == "sink1.monitor"
+    assert calls == [["pactl", "get-default-sink"]]  # nunca o yt-dlp
+    cmd = ffmpeg_command(Media("x.monitor", input_format="pulse"))
+    assert cmd[cmd.index("-i") - 2:cmd.index("-i") + 2] == ["-f", "pulse", "-i", "x.monitor"]
+    assert "-reconnect" not in cmd
+
+
 def test_audio_source_reads_local_file(tmp_path):
     wav = tmp_path / "a.wav"
     subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "sine=f=440:d=3",

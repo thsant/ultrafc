@@ -151,6 +151,17 @@ pixi run publish --channel @meu_canal --review-chat <id> --operators <id1,id2> -
 - Só os ids em `--operators` podem aprovar. O que foi enviado, publicado ou descartado fica em
   `checking/.publish-state.json`: um reinício não reenvia nem publica duas vezes.
 
+## Áudio do computador
+Se a stream não abre (yt-dlp/streamlink falham), abra a transmissão no navegador e transcreva o som que sai
+no computador:
+```
+pixi run tx pulse: --name <stream>
+```
+`pulse:` usa o monitor da saída de áudio padrão (PulseAudio/PipeWire), não o microfone. Para outra fonte,
+`pixi run tx pulse:<fonte>` com um nome de `pactl list short sources` terminado em `.monitor`. Repetir o
+`--name` da stream original mantém a pasta de log, os falantes salvos e a checagem em andamento. Deixe o
+navegador sem mudo e evite outros sons no computador, que também seriam transcritos.
+
 ## Testes
 ```
 pixi run test
