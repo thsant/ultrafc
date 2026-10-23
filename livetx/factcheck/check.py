@@ -63,8 +63,14 @@ plausível e diga na justificativa se precisou interpretar.
 - Resultado:
   - `verdadeiro`: as fontes confirmam a afirmação no essencial;
   - `falso`: as fontes contradizem a afirmação no essencial;
-  - `incompleto`: a afirmação é parcialmente correta, exagera, omite contexto decisivo, ou as \
-fontes encontradas não bastam para concluir.
+  - `exagerado`: o fato existe, mas a afirmação infla número, intensidade, frequência ou alcance \
+(ex.: diz que algo caiu 2 pontos quando caiu 1);
+  - `omissão`: o que foi dito está correto, mas deixa de fora um contexto que muda a conclusão \
+(ex.: o valor nominal é recorde, mas em proporção do PIB não é);
+  - `inconclusivo`: depois de pesquisar, as fontes não bastam para confirmar nem refutar. Diga na \
+justificativa o que faltou. Não use para casos em que a evidência aponta claramente para outro resultado.
+  Se a afirmação está correta no essencial e só um detalhe secundário diverge, prefira `verdadeiro` e \
+aponte o detalhe na justificativa.
 - Ao terminar, chame `registrar_veredito` com o resultado, a justificativa e só as fontes que você \
 de fato consultou nesta pesquisa (com a URL exata). Não escreva o veredito em texto: use a ferramenta.\
 """

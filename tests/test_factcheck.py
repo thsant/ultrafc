@@ -192,3 +192,12 @@ def test_id_keeps_accented_letters_and_is_unique(tmp_path):
     assert first == "20261022-221135-mais-de-50-milhoes-votaram-em-flavio"
     (tmp_path / f"{first}.md").write_text("x")
     assert new_id(T0, "Mais de 50 milhões votaram em Flávio", tmp_path) == first + "-2"
+
+
+def test_verdict_tool_offers_new_results():
+    enum = checker.VERDICT_TOOL["input_schema"]["properties"]["resultado"]["enum"]
+    assert enum == ["verdadeiro", "falso", "exagerado", "omissão", "inconclusivo"]
+    for r in enum:
+        assert f"`{r}`" in checker.SYSTEM
+    md = render_verdict(claim(), Verdict("omissão", "x", [], "m", "t"))
+    assert "resultado: omissão" in md and "## Resultado: OMISSÃO" in md

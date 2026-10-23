@@ -22,7 +22,8 @@ from .tail import LogTail
 
 log = logging.getLogger("livetx.factcheck")
 
-RESULT_STYLE = {"verdadeiro": "bold green", "falso": "bold red", "incompleto": "bold yellow", "erro": "bold magenta"}
+RESULT_STYLE = {"verdadeiro": "bold green", "falso": "bold red", "exagerado": "bold dark_orange",
+                "omissão": "bold yellow", "inconclusivo": "bold blue", "erro": "bold magenta"}
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

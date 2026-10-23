@@ -90,9 +90,17 @@ pixi run check --log-dir logs/<stream>        # em outro terminal, junto com o p
    disse, horário, fala literal e por que checar).
 2. **Checagem** (`claude-opus-5-5` com busca e leitura de páginas na web): até 3 agentes em paralelo
    (`--max-parallel`), um por afirmação; os demais esperam na fila. O resultado vai para
-   `checking/checked/<id>.md`: **verdadeiro / falso / incompleto**, justificativa e fontes. Uma fonte citada
+   `checking/checked/<id>.md`: resultado, justificativa e fontes. Uma fonte citada
    pelo agente que não apareceu na pesquisa dele é marcada *(não consultada pelo agente)*. Uma falha
    gera `resultado: erro` com o motivo.
+
+   | Resultado | Quando |
+   |---|---|
+   | **verdadeiro** | as fontes confirmam o essencial (detalhes secundários vão na justificativa) |
+   | **falso** | as fontes contradizem o essencial |
+   | **exagerado** | o fato existe, mas o número, a intensidade ou o alcance foi inflado |
+   | **omissão** | o que foi dito está correto, mas falta um contexto que muda a conclusão |
+   | **inconclusivo** | depois da pesquisa, as fontes não bastam para confirmar nem refutar |
 
 Precisa de `ANTHROPIC_API_KEY` no ambiente (exportada no topo do `~/.bashrc`, antes do bloco que
 interrompe shells não interativos). Por padrão só analisa o que for escrito depois de iniciar; `--from-start`

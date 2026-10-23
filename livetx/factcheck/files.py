@@ -12,7 +12,7 @@ from pathlib import Path
 from ..logger import TIME_FORMAT
 from ..source import slugify
 
-RESULTS = ("verdadeiro", "falso", "incompleto")
+RESULTS = ("verdadeiro", "falso", "exagerado", "omissão", "inconclusivo")
 
 
 @dataclass
