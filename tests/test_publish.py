@@ -156,6 +156,10 @@ def test_card_is_square_png_with_result_color():
         img = Image.open(io.BytesIO(png))
         assert img.format == "PNG" and img.size == (SIZE, SIZE)
         assert img.getpixel((SIZE - 5, 5)) == Image.new("RGB", (1, 1), band).getpixel((0, 0))
+    from ultrafc.publish.card import fit
+
+    f, lines, _ = fit("INCONCLUSIVO", "B", range(112, 60, -4), 700, 130)  # uma palavra: cabe na largura
+    assert len(lines) == 1 and f.getlength(lines[0]) <= 700
     long = claim()
     long.afirmacao = "Ação, ônibus e coração " * 80  # cabe cortada, sem erro
     render_card(long, verdict(justificativa="ç " * 2000))

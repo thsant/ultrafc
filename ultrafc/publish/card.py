@@ -27,6 +27,27 @@ COLORS = {"verdadeiro": ("#1E8E3E", "#FFFFFF"), "falso": ("#D93025", "#FFFFFF"),
 BACKGROUND, INK, MUTED, RULE = "#FAFAF7", "#1F1F1F", "#5F6368", "#DADCE0"
 
 FONT_DIR = Path(sys.prefix) / "fonts"  # font-ttf-ubuntu, instalada pelo pixi
+MASCOT = Path(__file__).with_name("assets") / "mascot.png"
+MASCOT_SIZE = 196
+
+
+@lru_cache(maxsize=1)
+def mascot() -> Image.Image | None:
+    """O carcará em círculo com borda branca, para o canto da faixa; None se o arquivo faltar."""
+    try:
+        art = Image.open(MASCOT).convert("RGB")
+    except OSError:
+        return None
+    ring, scale = 6, 4  # desenha 4× maior e reduz: borda do círculo sem serrilhado
+    big = MASCOT_SIZE * scale
+    mask = Image.new("L", (big, big), 0)
+    ImageDraw.Draw(mask).ellipse((0, 0, big - 1, big - 1), fill=255)
+    inner = Image.new("L", (big, big), 0)
+    ImageDraw.Draw(inner).ellipse((ring * scale,) * 2 + (big - 1 - ring * scale,) * 2, fill=255)
+    out = Image.new("RGB", (big, big), "#FFFFFF")
+    out.paste(art.resize((big, big), Image.LANCZOS), (0, 0), inner)
+    out.putalpha(mask)
+    return out.resize((MASCOT_SIZE, MASCOT_SIZE), Image.LANCZOS)
 
 
 @lru_cache(maxsize=64)
@@ -53,7 +74,7 @@ def fit(text: str, weight: str, sizes: range, width: int, height: int,
     for size in sizes:
         f, step = font(weight, size), round(size * spacing)
         lines = wrap(text, f, width)
-        if len(lines) * step <= height:
+        if len(lines) * step <= height and all(f.getlength(line) <= width for line in lines):
             return f, lines, step
     keep = max(height // step, 1)
     if len(lines) > keep:
@@ -86,8 +107,12 @@ def render_card(claim: Claim, verdict: Verdict, brand: str | None = None, footer
     width = SIZE - 2 * PAD
 
     d.rectangle((0, 0, SIZE, BAND), fill=band)
+    label_width = width
+    if (bird := mascot()) is not None:
+        img.paste(bird, (SIZE - PAD + 24 - MASCOT_SIZE, (BAND - MASCOT_SIZE) // 2), bird)
+        label_width -= MASCOT_SIZE
     d.text((PAD, 52), "CHECAGEM", font=font("M", 32), fill=band_ink)
-    label, _, _ = fit(verdict.resultado.upper(), "B", range(112, 60, -4), width, 130)
+    label, _, _ = fit(verdict.resultado.upper(), "B", range(112, 60, -4), label_width, 130)
     d.text((PAD, 92), verdict.resultado.upper(), font=label, fill=band_ink)
 
     y = BAND + 52
