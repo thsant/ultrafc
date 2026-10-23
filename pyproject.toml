@@ -7,6 +7,8 @@ name = "livetx"
 version = "0.1.0"
 description = "Transcrição ao vivo do áudio de streams de vídeo para arquivos de log"
 requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = ["faster-whisper>=1.1", "numpy"]
 
 [project.scripts]

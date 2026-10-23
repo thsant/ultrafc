@@ -142,3 +142,6 @@ pixi run test
 pixi run ffmpeg -re -i amostra.mp3 -f mpegts udp://127.0.0.1:1234 &
 pixi run tx udp://127.0.0.1:1234
 ```
+
+## Licença
+[MIT](LICENSE) — uso, cópia, modificação e redistribuição livres, inclusive comercial, mantendo o aviso de copyright.
