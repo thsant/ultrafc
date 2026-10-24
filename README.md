@@ -108,7 +108,7 @@ pixi run check --log-dir logs/<stream>        # em outro terminal, junto com o p
    (`--max-parallel`), um por afirmação; os demais esperam na fila. Uma fonte citada pelo agente que não
    apareceu na pesquisa dele é marcada *(não consultada pelo agente)*. Uma falha gera `resultado: erro`
    com o motivo (vai para `checked/`, mas não é publicada).
-3. **Revisão** (`claude-opus-5-5`, `--review-model`): confere o veredito relendo só as fontes que o
+3. **Revisão** (`claude-sonnet-5-5`, `--review-model`): confere o veredito relendo só as fontes que o
    checador citou, sem pesquisar outras (até 5 mil tokens por página). Aprovado, vai para
    `checking/checked/<id>.md` (resultado, justificativa, fontes e a nota da revisão); reprovado, ou se a
    revisão falhar, vai para `checking/rejected/<id>.md` e nunca é publicado.

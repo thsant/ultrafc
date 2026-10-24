@@ -11,7 +11,7 @@ from .files import Claim, Review, Verdict, now
 
 log = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "claude-opus-5-5"
+DEFAULT_MODEL = "claude-sonnet-5-5"
 MAX_TURNS = 6
 FETCH_TOKENS = 5000  # por página: reler as fontes é o que mais pesa no custo da revisão
 

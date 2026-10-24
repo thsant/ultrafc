@@ -349,7 +349,7 @@ def test_rejected_checks_go_to_rejected_and_usage_is_saved(tmp_path):
     [snapshot] = (out / "usage").glob("band-*.json")
     data = json.loads(snapshot.read_text())
     assert (data["checagens"], data["aprovadas"], data["rejeitadas"]) == (3, 1, 2)
-    assert set(data["modelos"]) >= {"claude-haiku-5-5", "claude-opus-5-5"}
+    assert set(data["modelos"]) >= {"claude-haiku-5-5", "claude-sonnet-5-5"}
 
 
 def test_usage_cost_includes_searches():
